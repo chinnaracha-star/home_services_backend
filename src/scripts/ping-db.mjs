@@ -1,4 +1,4 @@
-import { query } from "../src/configs/db.mjs";
+import { query } from "../configs/db.mjs";
 
 try {
   await query("SELECT 1");

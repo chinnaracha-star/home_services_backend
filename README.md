@@ -11,6 +11,7 @@ Backend API ของ Home Services ใช้ Express, `pg` และ Raw SQL �
 ```bash
 npm install
 npm run db:ping
+npm run db:migrate
 npm run dev
 ```
 
