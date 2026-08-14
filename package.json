@@ -2,8 +2,12 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "Backend_API_for_Home_Services_final_project",
-  "main": "index.js",
+  "main": "src/server.mjs",
   "scripts": {
+    "dev": "nodemon src/server.mjs",
+    "start": "node src/server.mjs",
+    "db:ping": "node scripts/ping-db.mjs",
+    "db:migrate": "node scripts/migrate.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -13,7 +17,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/chinnaracha-star/home_services_backend/issues"
   },
@@ -21,7 +25,8 @@
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
