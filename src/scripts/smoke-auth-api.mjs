@@ -45,6 +45,34 @@ try {
   const unauthAdmin = await get("/api/admin/categories");
   assert.equal(unauthAdmin.response.status, 401);
 
+  // 4. User register validation (does not change old /auth/register)
+  const invalidUserRegister = await post("/auth/user/register", {
+    fullName: "สมชาย",
+    email: "test@example.co.th",
+    phone: "123",
+    password: "123",
+    acceptedTerms: false,
+  });
+  assert.equal(invalidUserRegister.response.status, 400);
+  assert.equal(invalidUserRegister.body.code, "VALIDATION_ERROR");
+
+  const missingTerms = await post("/auth/user/register", {
+    fullName: "John Doe",
+    email: "user@example.com",
+    phone: "0812345678",
+    password: "password12345",
+    acceptedTerms: false,
+  });
+  assert.equal(missingTerms.response.status, 400);
+  assert.ok(missingTerms.body.errors.some((error) => error.field === "acceptedTerms"));
+
+  const shortPasswordUserLogin = await post("/auth/user/login", {
+    email: "user@example.com",
+    password: "short",
+  });
+  assert.equal(shortPasswordUserLogin.response.status, 400);
+  assert.ok(shortPasswordUserLogin.body.errors.some((error) => error.field === "password"));
+
   console.log("Auth API basic tests passed!");
 } finally {
   server.close();
