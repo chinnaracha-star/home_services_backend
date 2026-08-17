@@ -9,6 +9,7 @@ import { serviceRouter } from "./routes/service.route.mjs";
 import adminCategoryRouter from "./routes/admin.category.mjs";
 import adminServiceRouter from "./routes/admin.service.mjs";
 import authRouter from "./routes/auth.route.mjs";
+import { userAuthRouter } from "./routes/user-auth.route.mjs";
 
 export const app = express();
 
@@ -27,6 +28,8 @@ app.use("/api/categories", categoryRouter);
 app.use("/api/services", serviceRouter);
 app.use("/api/admin/categories", adminCategoryRouter);
 app.use("/api/admin/services", adminServiceRouter);
+app.use("/auth/user", userAuthRouter);
+app.use("/api/auth/user", userAuthRouter);
 app.use("/auth", authRouter);
 app.use("/api/auth", authRouter);
 
