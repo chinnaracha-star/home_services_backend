@@ -32,6 +32,7 @@ export async function findServices({ featured, limit }) {
       JOIN categories category ON category.category_id = service.category_id
       LEFT JOIN service_options option ON option.service_id = service.service_id
       WHERE service.is_active = true
+        AND category.is_active = true
         AND ($1::boolean = false OR service.is_featured = true)
       GROUP BY ${SUMMARY_GROUP}
       ORDER BY service.display_order ASC, service.service_id ASC
@@ -49,7 +50,7 @@ export async function findServiceById(serviceId) {
       FROM services service
       JOIN categories category ON category.category_id = service.category_id
       LEFT JOIN service_options option ON option.service_id = service.service_id
-      WHERE service.service_id = $1 AND service.is_active = true
+      WHERE service.service_id = $1 AND service.is_active = true AND category.is_active = true
       GROUP BY ${SUMMARY_GROUP}
       LIMIT 1
     `,

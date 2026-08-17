@@ -6,6 +6,7 @@ export async function findCategories() {
     `
       SELECT category_id::text AS id, name
       FROM categories
+      WHERE is_active = true
       ORDER BY name ASC, category_id ASC
     `,
   );
@@ -25,25 +26,40 @@ const categoryRepository = {
     return result.rows[0];
   },
 
+  findByName: async (name) => {
+    const result = await pool.query(
+      "SELECT * FROM categories WHERE name = $1 LIMIT 1",
+      [name],
+    );
+    return result.rows[0];
+  },
+
   create: async (name) => {
     const query = "INSERT INTO categories (name) VALUES ($1) RETURNING *";
     const result = await pool.query(query, [name]);
     return result.rows[0];
   },
 
-  update: async (id, name) => {
+  update: async (id, { name, is_active } = {}) => {
     const query = `
       UPDATE categories 
-      SET name = COALESCE($1, name), updated_at = NOW() 
-      WHERE category_id = $2 
+      SET name = COALESCE($1, name),
+          is_active = COALESCE($2, is_active),
+          updated_at = NOW() 
+      WHERE category_id = $3 
       RETURNING *
     `;
-    const result = await pool.query(query, [name, id]);
+    const result = await pool.query(query, [name ?? null, is_active ?? null, id]);
     return result.rows[0];
   },
 
   delete: async (id) => {
-    const query = "DELETE FROM categories WHERE category_id = $1 RETURNING *";
+    const query = `
+      UPDATE categories
+      SET is_active = false, updated_at = NOW()
+      WHERE category_id = $1 AND is_active = true
+      RETURNING *
+    `;
     const result = await pool.query(query, [id]);
     return result.rows[0];
   },
