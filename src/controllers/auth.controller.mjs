@@ -1,53 +1,151 @@
-import { query } from "../configs/db.mjs";
 import { supabase } from "../configs/supabase.mjs";
+import {
+  findUserById,
+  findUserByEmail,
+  createUser,
+} from "../repositories/user.repository.mjs";
+import {
+  validateRegister,
+  validateLogin,
+} from "../validators/auth.validator.mjs";
 
-export async function login(req, res) {
+export async function register(req, res, next) {
   try {
-    const { email, password } = req.body;
+    const { errors, value } = validateRegister(req.body);
 
-    // get data from database where email equals to the email from request body
-    const result = await query(
-      `
-        SELECT email
-        FROM users
-        WHERE email = $1
-        `,
-      [email],
-    );
-
-    // if the result is empty, then register the user, otherwise login the user
-    if (result.rows.length === 0) {
-      await supabase.auth.signUp({ email, password });
-      res.status(200).json({
-        message: "register successfully",
+    if (errors.length > 0) {
+      res.status(400).json({
+        message: "ข้อมูลการลงทะเบียนไม่ถูกต้อง",
+        code: "VALIDATION_ERROR",
+        errors,
       });
-    } else {
-      const { data } = await supabase.auth.signInWithPassword({
+      return;
+    }
+
+    const { email, password, fullName, phone } = value;
+
+    // ตรวจสอบว่ามีอีเมลนี้ในระบบแล้วหรือไม่
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
+      res.status(409).json({
+        message: "อีเมลนี้ถูกใช้งานแล้ว",
+        code: "EMAIL_ALREADY_EXISTS",
+        errors: [{ field: "email", message: "อีเมลนี้ถูกใช้งานแล้ว" }],
+      });
+      return;
+    }
+
+    // สมัครสมาชิกผ่าน Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          phone,
+        },
+      },
+    });
+
+    if (authError || !authData?.user) {
+      res.status(400).json({
+        message: authError?.message || "ไม่สามารถลงทะเบียนผู้ใช้ได้",
+        code: "AUTH_REGISTRATION_FAILED",
+      });
+      return;
+    }
+
+    // บันทึกข้อมูลลงใน PostgreSQL users table
+    const createdUser = await createUser({
+      username: email.split("@")[0],
+      email: authData.user.email,
+      fullName,
+      phone,
+      role: "USER",
+    });
+
+    res.status(201).json({
+      message: "ลงทะเบียนสำเร็จ",
+      data: {
+        user: createdUser,
+        session: authData.session,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function login(req, res, next) {
+  try {
+    const { errors, value } = validateLogin(req.body);
+
+    if (errors.length > 0) {
+      res.status(400).json({
+        message: "กรุณากรอกข้อมูลเข้าสู่ระบบให้ครบถ้วน",
+        code: "VALIDATION_ERROR",
+        errors,
+      });
+      return;
+    }
+
+    const { email, password } = value;
+
+    // ตรวจสอบรหัสผ่านกับ Supabase Auth
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      res.status(200).json({
-        message: "login successfully",
-        data: data,
+    if (authError || !authData?.user || !authData?.session) {
+      res.status(401).json({
+        message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+        code: "INVALID_CREDENTIALS",
+      });
+      return;
+    }
+
+    // ดึงข้อมูล Profile และ Role จาก PostgreSQL users table โดยใช้ email
+    let userProfile = await findUserByEmail(authData.user.email);
+
+    if (!userProfile) {
+      // กรณี user อยู่ใน Supabase แต่ยังไม่มีใน PostgreSQL (เช่น Seed มา) ให้สร้างให้อัตโนมัติ
+      userProfile = await createUser({
+        username: authData.user.email.split("@")[0],
+        email: authData.user.email,
+        fullName:
+          authData.user.user_metadata?.full_name ||
+          authData.user.email.split("@")[0],
+        phone: authData.user.user_metadata?.phone || null,
+        role: "USER",
       });
     }
-  } catch (error) {
-    res.status(500).json({
-      message: "Server connection error",
+
+    res.status(200).json({
+      message: "เข้าสู่ระบบสำเร็จ",
+      data: {
+        user: userProfile,
+        session: {
+          accessToken: authData.session.access_token,
+          refreshToken: authData.session.refresh_token,
+          expiresAt: authData.session.expires_at,
+          tokenType: authData.session.token_type,
+        },
+      },
     });
+  } catch (error) {
+    next(error);
   }
 }
 
-export async function logout(req, res) {
+export async function logout(req, res, next) {
   try {
     await supabase.auth.signOut();
     res.status(200).json({
-      message: "logout successfully",
+      message: "ออกจากระบบสำเร็จ",
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Server connection error",
-    });
+    next(error);
   }
 }

@@ -21,10 +21,12 @@ app.use(express.json());
 
 app.use("/health", healthRouter);
 app.use("/api/users", userRouter);
+app.use("/user", userRouter);
 app.use("/api/categories", categoryRouter);
 app.use("/api/services", serviceRouter);
 app.use("/api/admin/categories", adminCategoryRouter);
 app.use("/auth", authRouter);
+app.use("/api/auth", authRouter);
 
 app.use((error, _req, res, _next) => {
   if (error instanceof HttpError) {
@@ -43,4 +45,3 @@ app.use((error, _req, res, _next) => {
     errors: [],
   });
 });
-
