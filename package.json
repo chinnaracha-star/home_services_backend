@@ -8,7 +8,7 @@
     "start": "node src/server.mjs",
     "db:ping": "node src/scripts/ping-db.mjs",
     "db:migrate": "node src/scripts/migrate.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
@@ -28,6 +28,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-validator": "^7.3.2",
+    "multer": "^2.2.0",
     "pg": "^8.16.3"
   },
   "devDependencies": {

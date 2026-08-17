@@ -34,6 +34,15 @@ app.use("/auth", authRouter);
 app.use("/api/auth", authRouter);
 
 app.use((error, _req, res, _next) => {
+  if (error?.code === "LIMIT_FILE_SIZE") {
+    res.status(400).json({
+      message: "รูปโปรไฟล์ต้องมีขนาดไม่เกิน 5MB",
+      code: "AVATAR_TOO_LARGE",
+      errors: [],
+    });
+    return;
+  }
+
   if (error instanceof HttpError) {
     res.status(error.status).json({
       message: error.message,
