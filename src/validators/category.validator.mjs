@@ -16,6 +16,7 @@ const validateCreateCategory = [
 const validateUpdateCategory = [
   param('id').isInt().withMessage('Invalid category ID format'),
   body('name').optional().isString(),
+  body('is_active').optional().isBoolean(),
   handleValidationErrors,
 ];
 
