@@ -79,3 +79,17 @@ export async function updateUserProfile(userId, profile) {
 
   return result.rows[0] ?? null;
 }
+
+export async function updateUserAvatar(userId, avatarUrl) {
+  const result = await query(
+    `
+      UPDATE users
+      SET avatar_url = $2, updated_at = now()
+      WHERE user_id = $1
+      RETURNING ${PROFILE_COLUMNS}
+    `,
+    [userId, avatarUrl],
+  );
+
+  return result.rows[0] ?? null;
+}

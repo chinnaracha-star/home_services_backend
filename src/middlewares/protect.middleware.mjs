@@ -1,60 +1,67 @@
 import { supabase } from "../configs/supabase.mjs";
 import { findUserById, findUserByEmail } from "../repositories/user.repository.mjs";
 
-export async function protect(req, res, next) {
-  try {
-    // 1. ตรวจสอบ dev header 'x-user-id' (สำหรับ development & smoke test)
-    const devUserId = req.headers["x-user-id"];
-    if (devUserId) {
-      const devUser = await findUserById(devUserId);
-      if (devUser) {
-        req.user = devUser;
-      } else {
-        req.user = { id: devUserId, email: null, role: "USER" };
+export function createProtect({
+  authClient = supabase,
+  findById = findUserById,
+  findByEmail = findUserByEmail,
+} = {}) {
+  return async function protect(req, res, next) {
+    try {
+      const devUserId = req.headers["x-user-id"];
+      if (devUserId) {
+        const devUser = await findById(devUserId);
+        if (devUser) {
+          req.user = devUser;
+        } else {
+          req.user = { id: devUserId, email: null, role: "USER" };
+        }
+        next();
+        return;
       }
-      return next();
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          message: "Access Denied: No token provided",
+          code: "UNAUTHORIZED",
+        });
+        return;
+      }
+
+      const token = authHeader.slice("Bearer ".length).trim();
+      const {
+        data: { user },
+        error: authError,
+      } = await authClient.auth.getUser(token);
+
+      if (authError || !user) {
+        res.status(401).json({
+          message: "Access Denied: Invalid or Expired token",
+          code: "UNAUTHORIZED",
+        });
+        return;
+      }
+
+      const dbUser = await findByEmail(user.email);
+      if (dbUser) {
+        req.user = dbUser;
+      } else {
+        req.user = {
+          id: user.id,
+          email: user.email,
+          role: "USER",
+          fullName: user.user_metadata?.full_name || "",
+        };
+      }
+
+      req.authUserId = user.id;
+      req.accessToken = token;
+      next();
+    } catch (error) {
+      next(error);
     }
-
-    // 2. ตรวจสอบ Authorization Bearer Header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).json({
-        message: "Access Denied: No token provided",
-        code: "UNAUTHORIZED",
-      });
-      return;
-    }
-
-    const token = authHeader.split(" ")[1];
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      res.status(401).json({
-        message: "Access Denied: Invalid or Expired token",
-        code: "UNAUTHORIZED",
-      });
-      return;
-    }
-
-    // ค้นหา user จาก email ในฐานข้อมูล
-    let dbUser = await findUserByEmail(user.email);
-
-    if (!dbUser) {
-      req.user = {
-        id: user.id,
-        email: user.email,
-        role: "USER",
-        fullName: user.user_metadata?.full_name || "",
-      };
-    } else {
-      req.user = dbUser;
-    }
-
-    next();
-  } catch (error) {
-    next(error);
-  }
+  };
 }
+
+export const protect = createProtect();
