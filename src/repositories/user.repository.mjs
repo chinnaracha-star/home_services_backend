@@ -5,7 +5,7 @@ const PROFILE_COLUMNS = `
   email,
   COALESCE(full_name, CONCAT(first_name, ' ', last_name), username) AS "fullName",
   phone,
-  address,
+  NULL AS address,
   avatar_url AS "avatarUrl",
   UPPER(role) AS role
 `;
@@ -62,8 +62,7 @@ export async function updateUserProfile(userId, profile) {
       SET
         full_name = $2,
         phone = $3,
-        address = $4,
-        avatar_url = $5,
+        avatar_url = $4,
         updated_at = now()
       WHERE user_id = $1
       RETURNING ${PROFILE_COLUMNS}
@@ -72,7 +71,6 @@ export async function updateUserProfile(userId, profile) {
       userId,
       profile.fullName,
       profile.phone,
-      profile.address,
       profile.avatarUrl,
     ],
   );
