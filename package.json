@@ -4,7 +4,7 @@
   "description": "Backend_API_for_Home_Services_final_project",
   "main": "src/server.mjs",
   "scripts": {
-    "dev": "nodemon src/server.mjs",
+    "dev": "node src/server.mjs",
     "start": "node src/server.mjs",
     "db:ping": "node src/scripts/ping-db.mjs",
     "db:migrate": "node src/scripts/migrate.mjs",
