@@ -8,6 +8,7 @@
     "start": "node src/server.mjs",
     "db:ping": "node src/scripts/ping-db.mjs",
     "db:migrate": "node src/scripts/migrate.mjs",
+    "db:seed-technician": "node src/scripts/seed-technician.mjs",
     "test": "node --test"
   },
   "repository": {
