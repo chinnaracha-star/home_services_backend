@@ -4,11 +4,11 @@
   "description": "Backend_API_for_Home_Services_final_project",
   "main": "src/server.mjs",
   "scripts": {
-    "dev": "nodemon src/server.mjs",
+    "dev": "node src/server.mjs",
     "start": "node src/server.mjs",
     "db:ping": "node src/scripts/ping-db.mjs",
     "db:migrate": "node src/scripts/migrate.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
@@ -23,9 +23,12 @@
   },
   "homepage": "https://github.com/chinnaracha-star/home_services_backend#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-validator": "^7.3.2",
+    "multer": "^2.2.0",
     "pg": "^8.16.3"
   },
   "devDependencies": {

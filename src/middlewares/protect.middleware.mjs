@@ -1,19 +1,67 @@
-export function protect(req, res, next) {
-  try {
-    const userId = req.headers["x-user-id"];
+import { supabase } from "../configs/supabase.mjs";
+import { findUserById, findUserByEmail } from "../repositories/user.repository.mjs";
 
-    if (!userId) {
-      res.status(401).json({
-        message: "กรุณาเข้าสู่ระบบ",
-        code: "UNAUTHORIZED",
-        errors: [],
-      });
-      return;
+export function createProtect({
+  authClient = supabase,
+  findById = findUserById,
+  findByEmail = findUserByEmail,
+} = {}) {
+  return async function protect(req, res, next) {
+    try {
+      const devUserId = req.headers["x-user-id"];
+      if (devUserId) {
+        const devUser = await findById(devUserId);
+        if (devUser) {
+          req.user = devUser;
+        } else {
+          req.user = { id: devUserId, email: null, role: "USER" };
+        }
+        next();
+        return;
+      }
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          message: "Access Denied: No token provided",
+          code: "UNAUTHORIZED",
+        });
+        return;
+      }
+
+      const token = authHeader.slice("Bearer ".length).trim();
+      const {
+        data: { user },
+        error: authError,
+      } = await authClient.auth.getUser(token);
+
+      if (authError || !user) {
+        res.status(401).json({
+          message: "Access Denied: Invalid or Expired token",
+          code: "UNAUTHORIZED",
+        });
+        return;
+      }
+
+      const dbUser = await findByEmail(user.email);
+      if (dbUser) {
+        req.user = dbUser;
+      } else {
+        req.user = {
+          id: user.id,
+          email: user.email,
+          role: "USER",
+          fullName: user.user_metadata?.full_name || "",
+        };
+      }
+
+      req.authUserId = user.id;
+      req.accessToken = token;
+      next();
+    } catch (error) {
+      next(error);
     }
-
-    req.user = { id: userId };
-    next();
-  } catch (error) {
-    next(error);
-  }
+  };
 }
+
+export const protect = createProtect();
