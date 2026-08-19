@@ -21,6 +21,19 @@ CREATE TABLE IF NOT EXISTS categories (
 
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
 
+CREATE TABLE IF NOT EXISTS promotions (
+  promotion_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  promotion_code VARCHAR(255) NOT NULL,
+  status VARCHAR(50) DEFAULT 'active',
+  quota INTEGER DEFAULT 0,
+  quota_used INTEGER DEFAULT 0,
+  type VARCHAR(50) NOT NULL,
+  discount NUMERIC NOT NULL,
+  expire TIMESTAMPTZ,
+  create_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  update_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
 DO $$
 DECLARE
   role_constraint_name text;
@@ -112,7 +125,6 @@ BEGIN
       FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE;
   END IF;
 END $$;
-
 INSERT INTO storage.buckets (
   id,
   name,
