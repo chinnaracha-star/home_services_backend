@@ -98,3 +98,18 @@ export function validateUpdateTechnicianSettings(body) {
     },
   };
 }
+
+export function validateLocation(body = {}) {
+  const latitude = Number(body.latitude);
+  const longitude = Number(body.longitude);
+  const errors = [];
+
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    errors.push({ field: "latitude", message: "latitude ต้องอยู่ระหว่าง -90 ถึง 90" });
+  }
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    errors.push({ field: "longitude", message: "longitude ต้องอยู่ระหว่าง -180 ถึง 180" });
+  }
+
+  return { errors, value: { latitude, longitude } };
+}
