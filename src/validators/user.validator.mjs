@@ -1,4 +1,5 @@
 const PHONE_PATTERN = /^0[0-9]{8,9}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -7,6 +8,7 @@ function asText(value) {
 export function validateUpdateProfile(body) {
   const errors = [];
   const fullName = asText(body?.fullName);
+  const email = asText(body?.email).toLowerCase();
   const phone = asText(body?.phone);
   const address = asText(body?.address);
   const avatarUrl = asText(body?.avatarUrl);
@@ -15,6 +17,13 @@ export function validateUpdateProfile(body) {
     errors.push({
       field: "fullName",
       message: "กรุณากรอกชื่อ-นามสกุล 2 ถึง 80 ตัวอักษร",
+    });
+  }
+
+  if (email && !EMAIL_PATTERN.test(email)) {
+    errors.push({
+      field: "email",
+      message: "กรุณากรอกอีเมลให้ถูกต้อง",
     });
   }
 
@@ -43,6 +52,7 @@ export function validateUpdateProfile(body) {
     errors,
     value: {
       fullName,
+      email: email || null,
       phone: phone || null,
       address: address || null,
       avatarUrl: avatarUrl || null,

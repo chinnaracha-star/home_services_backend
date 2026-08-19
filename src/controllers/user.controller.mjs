@@ -1,4 +1,7 @@
+import { createClient } from "@supabase/supabase-js";
+import { env } from "../configs/env.mjs";
 import {
+  findUserByEmail,
   findUserById,
   updateUserAvatar,
   updateUserProfile,
@@ -6,6 +9,25 @@ import {
 import { uploadAvatar } from "../services/avatar.service.mjs";
 import { HttpError } from "../utils/http-error.mjs";
 import { validateUpdateProfile } from "../validators/user.validator.mjs";
+
+async function syncAuthEmail(req, nextEmail) {
+  if (!req.accessToken || !nextEmail) return;
+
+  const userClient = createClient(env.supabaseUrl, env.supabaseAnonKey, {
+    global: {
+      headers: { Authorization: `Bearer ${req.accessToken}` },
+    },
+  });
+  const { error } = await userClient.auth.updateUser({ email: nextEmail });
+
+  if (error) {
+    throw new HttpError(
+      400,
+      "EMAIL_UPDATE_FAILED",
+      error.message || "ไม่สามารถอัปเดตอีเมลสำหรับเข้าสู่ระบบได้",
+    );
+  }
+}
 
 export async function getMyProfile(req, res, next) {
   try {
@@ -40,6 +62,24 @@ export async function updateMyProfile(req, res, next) {
         errors,
       });
       return;
+    }
+
+    const currentUser = await findUserById(req.user.id);
+    if (!currentUser) {
+      res.status(404).json({
+        message: "ไม่พบข้อมูลผู้ใช้",
+        code: "USER_NOT_FOUND",
+        errors: [],
+      });
+      return;
+    }
+
+    if (value.email && value.email !== String(currentUser.email || "").toLowerCase()) {
+      const existing = await findUserByEmail(value.email);
+      if (existing && String(existing.id) !== String(req.user.id)) {
+        throw new HttpError(409, "EMAIL_TAKEN", "อีเมลนี้ถูกใช้งานแล้ว");
+      }
+      await syncAuthEmail(req, value.email);
     }
 
     const user = await updateUserProfile(req.user.id, value);
