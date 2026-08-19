@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone text,
   address text,
   avatar_url text,
-  role text NOT NULL DEFAULT 'USER' CHECK (role IN ('USER', 'ADMIN')),
+  role text NOT NULL DEFAULT 'USER' CHECK (UPPER(role) IN ('USER', 'ADMIN', 'TECHNICIAN')),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -21,6 +21,110 @@ CREATE TABLE IF NOT EXISTS categories (
 
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
 
+CREATE TABLE IF NOT EXISTS promotions (
+  promotion_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  promotion_code VARCHAR(255) NOT NULL,
+  status VARCHAR(50) DEFAULT 'active',
+  quota INTEGER DEFAULT 0,
+  quota_used INTEGER DEFAULT 0,
+  type VARCHAR(50) NOT NULL,
+  discount NUMERIC NOT NULL,
+  expire TIMESTAMPTZ,
+  create_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  update_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+DO $$
+DECLARE
+  role_constraint_name text;
+BEGIN
+  SELECT con.conname
+  INTO role_constraint_name
+  FROM pg_constraint con
+  JOIN pg_class rel ON rel.oid = con.conrelid
+  JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+  WHERE nsp.nspname = 'public'
+    AND rel.relname = 'users'
+    AND con.contype = 'c'
+    AND pg_get_constraintdef(con.oid) ILIKE '%IN (%USER%'
+  LIMIT 1;
+
+  IF role_constraint_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.users DROP CONSTRAINT %I', role_constraint_name);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'users_role_check'
+  ) THEN
+    ALTER TABLE public.users
+      ADD CONSTRAINT users_role_check
+      CHECK (UPPER(role) IN ('USER', 'ADMIN', 'TECHNICIAN'));
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS technicians (
+  technician_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id BIGINT NOT NULL UNIQUE,
+  is_available BOOLEAN NOT NULL DEFAULT false,
+  address TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'users'
+      AND column_name = 'user_id'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'technicians_user_id_fkey'
+  ) THEN
+    ALTER TABLE technicians
+      ADD CONSTRAINT technicians_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES users(user_id);
+  END IF;
+END $$;
+
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS first_name TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_name TEXT;
+
+CREATE TABLE IF NOT EXISTS technician_skills (
+  technician_id BIGINT NOT NULL,
+  service_id BIGINT NOT NULL,
+  PRIMARY KEY (technician_id, service_id)
+);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'technicians'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'technician_skills_technician_id_fkey'
+  ) THEN
+    ALTER TABLE technician_skills
+      ADD CONSTRAINT technician_skills_technician_id_fkey
+      FOREIGN KEY (technician_id) REFERENCES technicians(technician_id) ON DELETE CASCADE;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'services'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'technician_skills_service_id_fkey'
+  ) THEN
+    ALTER TABLE technician_skills
+      ADD CONSTRAINT technician_skills_service_id_fkey
+      FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE;
+  END IF;
+END $$;
 INSERT INTO storage.buckets (
   id,
   name,

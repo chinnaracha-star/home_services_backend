@@ -21,3 +21,4 @@ export function requireRole(...allowedRoles) {
 }
 
 export const requireAdmin = requireRole("ADMIN");
+export const requireTechnician = requireRole("TECHNICIAN");

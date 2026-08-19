@@ -73,6 +73,30 @@ try {
   assert.equal(shortPasswordUserLogin.response.status, 400);
   assert.ok(shortPasswordUserLogin.body.errors.some((error) => error.field === "password"));
 
+  const invalidTechnicianLogin = await post("/auth/technician/login", {
+    email: "invalid-email",
+  });
+  assert.equal(invalidTechnicianLogin.response.status, 400);
+  assert.equal(invalidTechnicianLogin.body.code, "VALIDATION_ERROR");
+
+  const userOnTechnicianLogin = await post("/auth/technician/login", {
+    email: "user@user.com",
+    password: "userPassword123!",
+  });
+  assert.notEqual(userOnTechnicianLogin.response.status, 200);
+  if (userOnTechnicianLogin.response.status === 403) {
+    assert.equal(userOnTechnicianLogin.body.code, "NOT_TECHNICIAN");
+  }
+
+  const technicianLogin = await post("/auth/technician/login", {
+    email: "technician@example.com",
+    password: "technicianPassword123!",
+  });
+  assert.equal(technicianLogin.response.status, 200);
+  assert.equal(technicianLogin.body.data.user.role, "TECHNICIAN");
+  assert.ok(technicianLogin.body.data.technician.technicianId);
+  assert.ok(technicianLogin.body.data.session.accessToken);
+
   console.log("Auth API basic tests passed!");
 } finally {
   server.close();
