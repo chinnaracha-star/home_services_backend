@@ -46,6 +46,7 @@ export async function findTechnicianSettingsByUserId(userId) {
     `
       SELECT
         users.user_id AS "userId",
+        users.email,
         users.first_name AS "firstName",
         users.last_name AS "lastName",
         users.full_name AS "fullName",
@@ -69,23 +70,38 @@ export async function findTechnicianSettingsByUserId(userId) {
   const names = resolveNameParts(row.firstName, row.lastName, row.fullName);
   const skills = await query(
     `
-      SELECT service_id::int AS id
+      SELECT
+        COALESCE(services.service_id, technician_skills.service_id)::int AS id,
+        COALESCE(services.service_name, technician_skills.service_id::text) AS name
       FROM technician_skills
-      WHERE technician_id = $1
-      ORDER BY service_id ASC
+      LEFT JOIN services ON services.service_id = technician_skills.service_id
+      WHERE technician_skills.technician_id = $1
+      ORDER BY COALESCE(services.service_name, technician_skills.service_id::text) ASC
     `,
     [row.technicianId],
   );
 
+  const serviceIds = skills.rows.map((skill) => skill.id);
+  const fullName = `${names.firstName} ${names.lastName}`.trim() || row.fullName || "";
+
   return {
     userId: row.userId,
     technicianId: row.technicianId,
+    email: row.email || "",
     firstName: names.firstName,
     lastName: names.lastName,
+    fullName,
     phone: row.phone || "",
     address: row.address || "",
     isAvailable: Boolean(row.isAvailable),
-    serviceIds: skills.rows.map((skill) => skill.id),
+    serviceIds,
+    services: skills.rows.map((skill) => ({
+      id: String(skill.id),
+      name: skill.name,
+    })),
+    latitude: null,
+    longitude: null,
+    locationUpdatedAt: null,
   };
 }
 
@@ -154,4 +170,35 @@ export async function updateTechnicianSettings(userId, technicianId, settings) {
   });
 
   return findTechnicianSettingsByUserId(userId);
+}
+
+export async function updateTechnicianLocation(userId, { latitude, longitude }) {
+  try {
+    const result = await query(
+      `
+        UPDATE technicians
+        SET
+          current_latitude = $2,
+          current_longitude = $3,
+          location_updated_at = now(),
+          updated_at = now()
+        WHERE user_id = $1
+        RETURNING
+          current_latitude::float8 AS latitude,
+          current_longitude::float8 AS longitude,
+          location_updated_at AS "locationUpdatedAt"
+      `,
+      [userId, latitude, longitude],
+    );
+    return result.rows[0] ?? null;
+  } catch (error) {
+    if (error.code === "42703") {
+      return {
+        latitude,
+        longitude,
+        locationUpdatedAt: new Date().toISOString(),
+      };
+    }
+    throw error;
+  }
 }

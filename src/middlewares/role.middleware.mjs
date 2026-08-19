@@ -8,7 +8,9 @@ export function requireRole(...allowedRoles) {
       return;
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    const userRole = String(req.user.role || "").toUpperCase();
+    const allowed = allowedRoles.map((role) => String(role).toUpperCase());
+    if (!allowed.includes(userRole)) {
       res.status(403).json({
         message: "Access Denied: คุณไม่มีสิทธิ์เข้าถึงส่วนนี้ (Forbidden)",
         code: "FORBIDDEN",

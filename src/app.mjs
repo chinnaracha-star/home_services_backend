@@ -34,6 +34,7 @@ app.use("/api/admin/services", adminServiceRouter);
 app.use("/api/admin/promotions", adminPromotionRouter);
 app.use("/api/admin/promotion", adminPromotionRouter);
 app.use("/api/technician", technicianRouter);
+app.use("/api/technicians", technicianRouter);
 app.use("/auth/user", userAuthRouter);
 app.use("/api/auth/user", userAuthRouter);
 app.use("/auth/technician", technicianAuthRouter);

@@ -125,6 +125,11 @@ BEGIN
       FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE;
   END IF;
 END $$;
+
+ALTER TABLE technicians ADD COLUMN IF NOT EXISTS current_latitude NUMERIC(9, 6);
+ALTER TABLE technicians ADD COLUMN IF NOT EXISTS current_longitude NUMERIC(9, 6);
+ALTER TABLE technicians ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ;
+
 INSERT INTO storage.buckets (
   id,
   name,
