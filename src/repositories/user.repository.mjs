@@ -6,6 +6,9 @@ const PROFILE_COLUMNS = `
   user_id AS id,
   email,
   COALESCE(full_name, CONCAT(first_name, ' ', last_name), username) AS "fullName",
+  COALESCE(full_name, CONCAT(first_name, ' ', last_name), username) AS "displayName",
+  first_name AS "firstName",
+  last_name AS "lastName",
   phone,
   NULL AS address,
   avatar_url AS "avatarUrl",
@@ -61,14 +64,36 @@ function isUniqueViolation(error, column) {
   return constraint.includes(column) || detail.includes(`(${column})=`);
 }
 
-async function insertUser({ username, password, email, fullName, phone, role }) {
+async function insertUser({
+  username,
+  password,
+  email,
+  fullName,
+  firstName,
+  lastName,
+  phone,
+  role,
+}) {
+  const finalFullName =
+    fullName ||
+    (firstName && lastName ? `${firstName} ${lastName}`.trim() : username);
+
   const result = await query(
     `
-      INSERT INTO users (username, password, email, full_name, phone, role, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, now(), now())
+      INSERT INTO users (username, password, email, full_name, first_name, last_name, phone, role, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())
       RETURNING ${PROFILE_COLUMNS}
     `,
-    [username, password, email, fullName, phone, role],
+    [
+      username,
+      password,
+      email,
+      finalFullName,
+      firstName || null,
+      lastName || null,
+      phone,
+      role,
+    ],
   );
 
   return result.rows[0] ?? null;
@@ -79,18 +104,24 @@ export async function createUser({
   password = "",
   email,
   fullName,
+  displayName,
+  firstName = null,
+  lastName = null,
   phone = null,
   role = "USER",
 }) {
   const preferred = usernameFromEmail(username || email);
   let uname = await allocateUniqueUsername(preferred);
+  const resolvedFullName = displayName || fullName;
 
   try {
     return await insertUser({
       username: uname,
       password,
       email,
-      fullName,
+      fullName: resolvedFullName,
+      firstName,
+      lastName,
       phone,
       role,
     });
@@ -115,7 +146,9 @@ export async function createUser({
         username: uname,
         password,
         email,
-        fullName,
+        fullName: resolvedFullName,
+        firstName,
+        lastName,
         phone,
         role,
       });
@@ -126,23 +159,36 @@ export async function createUser({
 }
 
 export async function updateUserProfile(userId, profile) {
+  const resolvedFullName =
+    profile.displayName !== undefined
+      ? profile.displayName
+      : profile.fullName !== undefined
+        ? profile.fullName
+        : profile.firstName && profile.lastName
+          ? `${profile.firstName} ${profile.lastName}`.trim()
+          : null;
+
   const result = await query(
     `
       UPDATE users
       SET
-        full_name = $2,
-        phone = $3,
-        avatar_url = $4,
-        email = COALESCE($5, email),
+        full_name = COALESCE($2, full_name),
+        first_name = COALESCE($3, first_name),
+        last_name = COALESCE($4, last_name),
+        phone = COALESCE($5, phone),
+        avatar_url = COALESCE($6, avatar_url),
+        email = COALESCE($7, email),
         updated_at = now()
       WHERE user_id = $1
       RETURNING ${PROFILE_COLUMNS}
     `,
     [
       userId,
-      profile.fullName,
-      profile.phone,
-      profile.avatarUrl,
+      resolvedFullName,
+      profile.firstName !== undefined ? profile.firstName : null,
+      profile.lastName !== undefined ? profile.lastName : null,
+      profile.phone !== undefined ? profile.phone : null,
+      profile.avatarUrl !== undefined ? profile.avatarUrl : null,
       profile.email || null,
     ],
   );

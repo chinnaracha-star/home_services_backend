@@ -52,6 +52,9 @@ export function createProtect({
           email: user.email,
           role: "USER",
           fullName: user.user_metadata?.full_name || "",
+          displayName: user.user_metadata?.display_name || user.user_metadata?.full_name || "",
+          firstName: user.user_metadata?.first_name || null,
+          lastName: user.user_metadata?.last_name || null,
         };
       }
 

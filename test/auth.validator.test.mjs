@@ -53,12 +53,22 @@ test("user register accepts English names with apostrophe or hyphen", () => {
   );
 });
 
-test("user register rejects a name that is not English letters", () => {
+test("user register accepts Thai and English names", () => {
   const thaiName = validateUserRegister({ ...validUserRegister, fullName: "สมชาย ใจดี" });
-  const withNumber = validateUserRegister({ ...validUserRegister, fullName: "John2 Doe" });
+  const englishName = validateUserRegister({ ...validUserRegister, fullName: "John Doe" });
+  const withFirstLast = validateUserRegister({ ...validUserRegister, firstName: "สมชาย", lastName: "ใจดี" });
 
-  assert.equal(thaiName.errors[0].field, "fullName");
+  assert.equal(thaiName.errors.length, 0);
+  assert.equal(englishName.errors.length, 0);
+  assert.equal(withFirstLast.errors.length, 0);
+});
+
+test("user register rejects a name with numbers or special symbols", () => {
+  const withNumber = validateUserRegister({ ...validUserRegister, fullName: "John2 Doe" });
+  const withSpecial = validateUserRegister({ ...validUserRegister, firstName: "John#", lastName: "Doe" });
+
   assert.equal(withNumber.errors[0].field, "fullName");
+  assert.equal(withSpecial.errors[0].field, "firstName");
 });
 
 test("user register requires a valid phone number", () => {
