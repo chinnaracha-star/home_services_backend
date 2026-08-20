@@ -74,6 +74,12 @@ export async function login(req, res, next) {
         fullName:
           authData.user.user_metadata?.full_name ||
           authData.user.email.split("@")[0],
+        displayName:
+          authData.user.user_metadata?.display_name ||
+          authData.user.user_metadata?.full_name ||
+          authData.user.email.split("@")[0],
+        firstName: authData.user.user_metadata?.first_name || null,
+        lastName: authData.user.user_metadata?.last_name || null,
         phone: authData.user.user_metadata?.phone || null,
         role: "USER",
       });

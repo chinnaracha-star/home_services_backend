@@ -1,5 +1,9 @@
 import { supabase } from "../configs/supabase.mjs";
-import { createUser, findUserByEmail } from "../repositories/user.repository.mjs";
+import {
+  createUser,
+  findUserByEmail,
+  updateUserProfile,
+} from "../repositories/user.repository.mjs";
 import { HttpError } from "../utils/http-error.mjs";
 
 function emailAlreadyExistsError() {
@@ -11,9 +15,31 @@ function emailAlreadyExistsError() {
   );
 }
 
-export async function ensurePublicUser({ email, fullName, phone, role = "USER" }) {
+export async function ensurePublicUser({
+  email,
+  fullName,
+  displayName,
+  firstName,
+  lastName,
+  phone,
+  role = "USER",
+}) {
   const existingUser = await findUserByEmail(email);
   if (existingUser) {
+    if (
+      (firstName || lastName || displayName) &&
+      (!existingUser.firstName || !existingUser.lastName || !existingUser.displayName)
+    ) {
+      const updated = await updateUserProfile(existingUser.id, {
+        firstName: firstName || existingUser.firstName,
+        lastName: lastName || existingUser.lastName,
+        displayName: displayName || existingUser.displayName || fullName,
+        fullName: fullName || displayName || existingUser.fullName,
+        phone: phone || existingUser.phone,
+        avatarUrl: existingUser.avatarUrl,
+      });
+      if (updated) return updated;
+    }
     return existingUser;
   }
 
@@ -22,6 +48,9 @@ export async function ensurePublicUser({ email, fullName, phone, role = "USER" }
       username: email.split("@")[0],
       email,
       fullName,
+      displayName,
+      firstName,
+      lastName,
       phone,
       role,
     });
@@ -37,7 +66,20 @@ export async function ensurePublicUser({ email, fullName, phone, role = "USER" }
   }
 }
 
-export async function registerCustomer({ email, password, fullName, phone }) {
+export async function registerCustomer({
+  email,
+  password,
+  fullName,
+  displayName,
+  firstName,
+  lastName,
+  phone,
+}) {
+  const resolvedFullName =
+    displayName ||
+    fullName ||
+    (firstName && lastName ? `${firstName} ${lastName}`.trim() : email.split("@")[0]);
+
   const existingUser = await findUserByEmail(email);
 
   if (existingUser) {
@@ -61,7 +103,10 @@ export async function registerCustomer({ email, password, fullName, phone }) {
     password,
     options: {
       data: {
-        full_name: fullName,
+        full_name: resolvedFullName,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        display_name: displayName || resolvedFullName,
         phone,
       },
     },
@@ -77,7 +122,10 @@ export async function registerCustomer({ email, password, fullName, phone }) {
 
   const user = await ensurePublicUser({
     email: authData.user.email,
-    fullName,
+    fullName: resolvedFullName,
+    displayName: displayName || resolvedFullName,
+    firstName,
+    lastName,
     phone,
     role: "USER",
   });
