@@ -1,4 +1,6 @@
 import { query } from "../configs/db.mjs";
+import { HttpError } from "../utils/http-error.mjs";
+import { nextAvailableUsername, usernameFromEmail } from "../utils/username.mjs";
 
 const PROFILE_COLUMNS = `
   user_id AS id,
@@ -34,6 +36,44 @@ export async function findUserByEmail(email) {
   return result.rows[0] ?? null;
 }
 
+async function allocateUniqueUsername(preferred) {
+  const base = (preferred || "user").slice(0, 40);
+  const result = await query(
+    `
+      SELECT username
+      FROM users
+      WHERE username = $1
+         OR starts_with(username, $1 || '_')
+    `,
+    [base],
+  );
+
+  return nextAvailableUsername(base, result.rows.map((row) => row.username));
+}
+
+function isUniqueViolation(error, column) {
+  if (error?.code !== "23505") {
+    return false;
+  }
+
+  const constraint = String(error.constraint || "");
+  const detail = String(error.detail || "");
+  return constraint.includes(column) || detail.includes(`(${column})=`);
+}
+
+async function insertUser({ username, password, email, fullName, phone, role }) {
+  const result = await query(
+    `
+      INSERT INTO users (username, password, email, full_name, phone, role, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, now(), now())
+      RETURNING ${PROFILE_COLUMNS}
+    `,
+    [username, password, email, fullName, phone, role],
+  );
+
+  return result.rows[0] ?? null;
+}
+
 export async function createUser({
   username = null,
   password = "",
@@ -42,17 +82,47 @@ export async function createUser({
   phone = null,
   role = "USER",
 }) {
-  const uname = username || email.split("@")[0];
-  const result = await query(
-    `
-      INSERT INTO users (username, password, email, full_name, phone, role, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, now(), now())
-      RETURNING ${PROFILE_COLUMNS}
-    `,
-    [uname, password, email, fullName, phone, role],
-  );
+  const preferred = usernameFromEmail(username || email);
+  let uname = await allocateUniqueUsername(preferred);
 
-  return result.rows[0] ?? null;
+  try {
+    return await insertUser({
+      username: uname,
+      password,
+      email,
+      fullName,
+      phone,
+      role,
+    });
+  } catch (error) {
+    if (isUniqueViolation(error, "email")) {
+      const existing = await findUserByEmail(email);
+      if (existing) {
+        return existing;
+      }
+
+      throw new HttpError(
+        409,
+        "EMAIL_ALREADY_EXISTS",
+        "อีเมลนี้ถูกใช้งานแล้ว",
+        [{ field: "email", message: "อีเมลนี้ถูกใช้งานแล้ว" }],
+      );
+    }
+
+    if (isUniqueViolation(error, "username")) {
+      uname = await allocateUniqueUsername(`${preferred}_${Date.now().toString(36)}`);
+      return insertUser({
+        username: uname,
+        password,
+        email,
+        fullName,
+        phone,
+        role,
+      });
+    }
+
+    throw error;
+  }
 }
 
 export async function updateUserProfile(userId, profile) {
