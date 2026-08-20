@@ -5,6 +5,7 @@ import {
 } from "../validators/technician.validator.mjs";
 import {
   findActiveServiceIds,
+  findTechnicianJobs,
   findTechnicianSettingsByUserId,
   updateTechnicianLocation,
   updateTechnicianSettings,
@@ -188,18 +189,32 @@ export async function postDeclineServiceRequest(_req, res, next) {
   next(new HttpError(404, "ORDER_NOT_FOUND", "ไม่พบคำขอบริการ"));
 }
 
-export async function getMyTechnicianJobs(_req, res, next) {
+
+export async function getMyTechnicianJob(_req, res, next) {
+  next(new HttpError(404, "JOB_NOT_FOUND", "ไม่พบงานที่ต้องการ"));
+}
+
+export async function getMyTechnicianJobs(req, res, next) {
   try {
+    const sort = req.query.sort || "oldest";
+
+    if (!["oldest", "newest", "nearest"].includes(sort)) {
+      throw new HttpError(
+        400,
+        "INVALID_SORT",
+        "รองรับ sort เฉพาะ oldest, newest หรือ nearest",
+      );
+    }
+    
+    const technician = await getOwnedTechnicianSettings(req.user.id);
+    const jobs = await findTechnicianJobs(technician.technicianId, { sort });
+
     res.status(200).json({
       message: "Success",
-      data: [],
-      meta: { total: 0 },
+      data: jobs,
+      meta: { total: jobs.length, sort },
     });
   } catch (error) {
     next(error);
   }
-}
-
-export async function getMyTechnicianJob(_req, res, next) {
-  next(new HttpError(404, "JOB_NOT_FOUND", "ไม่พบงานที่ต้องการ"));
 }
