@@ -1,6 +1,6 @@
 const PHONE_PATTERN = /^0[0-9]{8,9}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.com$/i;
-const FULL_NAME_PATTERN = /^[A-Za-z]+(?:[ '\-][A-Za-z]+)*$/;
+const NAME_PATTERN = /^[\p{Letter}\p{Mark}]+(?:[ '\-][\p{Letter}\p{Mark}]+)*$/u;
 const MIN_PASSWORD_LENGTH = 12;
 
 function asText(value) {
@@ -29,27 +29,75 @@ function validatePasswordValue(password) {
 
 export function validateUserRegister(body) {
   const errors = [];
-  const fullName = asText(body?.fullName);
+  const firstName = asText(body?.firstName);
+  const lastName = asText(body?.lastName);
+  let fullName = asText(body?.fullName);
+  const displayName = asText(body?.displayName);
   const email = asText(body?.email).toLowerCase();
   const phone = asText(body?.phone);
   const password = typeof body?.password === "string" ? body.password : "";
   const acceptedTerms = body?.acceptedTerms === true;
 
-  if (!fullName) {
-    errors.push({
-      field: "fullName",
-      message: "กรุณากรอกชื่อ-นามสกุล",
-    });
-  } else if (fullName.length < 2 || fullName.length > 80) {
-    errors.push({
-      field: "fullName",
-      message: "กรุณากรอกชื่อ-นามสกุล 2 ถึง 80 ตัวอักษร",
-    });
-  } else if (!FULL_NAME_PATTERN.test(fullName)) {
-    errors.push({
-      field: "fullName",
-      message: "ชื่อ-นามสกุลต้องเป็นตัวอักษรภาษาอังกฤษเท่านั้น และใช้อักขระ ' หรือ - ได้",
-    });
+  if (firstName || lastName) {
+    if (!firstName) {
+      errors.push({
+        field: "firstName",
+        message: "กรุณากรอกชื่อจริง",
+      });
+    } else if (firstName.length < 2 || firstName.length > 50) {
+      errors.push({
+        field: "firstName",
+        message: "กรุณากรอกชื่อจริง 2 ถึง 50 ตัวอักษร",
+      });
+    } else if (!NAME_PATTERN.test(firstName)) {
+      errors.push({
+        field: "firstName",
+        message: "ชื่อจริงต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษเท่านั้น",
+      });
+    }
+
+    if (!lastName) {
+      errors.push({
+        field: "lastName",
+        message: "กรุณากรอกนามสกุล",
+      });
+    } else if (lastName.length < 2 || lastName.length > 50) {
+      errors.push({
+        field: "lastName",
+        message: "กรุณากรอกนามสกุล 2 ถึง 50 ตัวอักษร",
+      });
+    } else if (!NAME_PATTERN.test(lastName)) {
+      errors.push({
+        field: "lastName",
+        message: "นามสกุลต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษเท่านั้น",
+      });
+    }
+
+    if (!fullName) {
+      fullName = displayName || `${firstName} ${lastName}`.trim();
+    }
+  } else {
+    // Legacy fallback if only fullName is provided
+    if (!fullName) {
+      errors.push({
+        field: "firstName",
+        message: "กรุณากรอกชื่อจริง",
+      });
+      errors.push({
+        field: "lastName",
+        message: "กรุณากรอกนามสกุล",
+      });
+    } else if (fullName.length < 2 || fullName.length > 80) {
+      errors.push({
+        field: "fullName",
+        message: "กรุณากรอกชื่อ-นามสกุล 2 ถึง 80 ตัวอักษร",
+      });
+    } else if (!NAME_PATTERN.test(fullName)) {
+      errors.push({
+        field: "fullName",
+        message: "ชื่อ-นามสกุลต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษเท่านั้น",
+      });
+    }
   }
 
   const emailError = validateEmailValue(email);
@@ -84,7 +132,10 @@ export function validateUserRegister(body) {
   return {
     errors,
     value: {
+      firstName: firstName || (fullName ? fullName.split(/\s+/)[0] : ""),
+      lastName: lastName || (fullName ? fullName.split(/\s+/).slice(1).join(" ") : ""),
       fullName,
+      displayName: displayName || fullName,
       email,
       phone,
       password,
