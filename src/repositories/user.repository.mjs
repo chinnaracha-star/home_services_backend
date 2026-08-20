@@ -63,6 +63,7 @@ export async function updateUserProfile(userId, profile) {
         full_name = $2,
         phone = $3,
         avatar_url = $4,
+        email = COALESCE($5, email),
         updated_at = now()
       WHERE user_id = $1
       RETURNING ${PROFILE_COLUMNS}
@@ -72,6 +73,7 @@ export async function updateUserProfile(userId, profile) {
       profile.fullName,
       profile.phone,
       profile.avatarUrl,
+      profile.email || null,
     ],
   );
 
