@@ -14,6 +14,11 @@ import { userAuthRouter } from "./routes/user-auth.route.mjs";
 import { technicianAuthRouter } from "./routes/technician-auth.route.mjs";
 import { technicianRouter } from "./routes/technician.route.mjs";
 
+import dotenv from "dotenv";
+
+import addressRouter from "./routes/address.routes.mjs";
+import paymentRouter from "./routes/payment.route.mjs";
+
 export const app = express();
 
 app.use(
@@ -41,6 +46,10 @@ app.use("/auth/technician", technicianAuthRouter);
 app.use("/api/auth/technician", technicianAuthRouter);
 app.use("/auth", authRouter);
 app.use("/api/auth", authRouter);
+// Address routes
+app.use("/", addressRouter);
+// Payment routes
+app.use("/", paymentRouter);
 
 app.use((error, _req, res, _next) => {
   if (error?.code === "LIMIT_FILE_SIZE") {

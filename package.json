@@ -25,14 +25,21 @@
   "homepage": "https://github.com/chinnaracha-star/home_services_backend#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
+    "axios": "^1.19.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-validator": "^7.3.2",
     "multer": "^2.2.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "stripe": "^22.5.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.2.0",
+    "nodemon": "^3.1.14",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^7.0.2"
   }
 }
