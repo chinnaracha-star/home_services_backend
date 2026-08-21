@@ -18,6 +18,7 @@ import dotenv from "dotenv";
 
 import addressRouter from "./routes/address.routes.mjs";
 import paymentRouter from "./routes/payment.route.mjs";
+import promotionRouter from "./routes/promotion.routes.mjs";
 
 export const app = express();
 
@@ -50,6 +51,8 @@ app.use("/api/auth", authRouter);
 app.use("/", addressRouter);
 // Payment routes
 app.use("/", paymentRouter);
+// Promotion routes
+app.use("/", promotionRouter);
 
 app.use((error, _req, res, _next) => {
   if (error?.code === "LIMIT_FILE_SIZE") {
