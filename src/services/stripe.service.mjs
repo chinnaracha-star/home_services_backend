@@ -16,3 +16,11 @@ export async function createToStripe(amount) {
 
     return response
 }
+
+export async function getPaymentStatusFromStripe(paymentIntentId) {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    const response = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    return response
+}
