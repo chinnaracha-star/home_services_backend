@@ -237,3 +237,43 @@ BEGIN
       );
   END IF;
 END $$;
+<<<<<<< HEAD
+=======
+
+-- Two-way Delete Sync Triggers between public.users and auth.users
+CREATE OR REPLACE FUNCTION delete_auth_user_on_public_delete()
+RETURNS trigger AS $$
+BEGIN
+  IF pg_trigger_depth() > 1 THEN
+    RETURN old;
+  END IF;
+
+  DELETE FROM auth.users WHERE LOWER(email) = LOWER(old.email) OR id = old.id;
+  RETURN old;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS tr_delete_auth_user_on_public_delete ON public.users;
+CREATE TRIGGER tr_delete_auth_user_on_public_delete
+AFTER DELETE ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION delete_auth_user_on_public_delete();
+
+CREATE OR REPLACE FUNCTION delete_public_user_on_auth_delete()
+RETURNS trigger AS $$
+BEGIN
+  IF pg_trigger_depth() > 1 THEN
+    RETURN old;
+  END IF;
+
+  DELETE FROM public.users WHERE LOWER(email) = LOWER(old.email) OR id = old.id;
+  RETURN old;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS tr_delete_public_user_on_auth_delete ON auth.users;
+CREATE TRIGGER tr_delete_public_user_on_auth_delete
+AFTER DELETE ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION delete_public_user_on_auth_delete();
+>>>>>>> dev

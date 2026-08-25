@@ -7,6 +7,7 @@ import {
 } from "../validators/technician.validator.mjs";
 import {
   findActiveServiceIds,
+  findTechnicianJobs,
   findTechnicianSettingsByUserId,
   updateTechnicianLocation,
   updateTechnicianSettings,
