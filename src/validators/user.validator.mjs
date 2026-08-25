@@ -6,83 +6,63 @@ function asText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function optionalText(body, field, { lowercase = false } = {}) {
+  if (!Object.hasOwn(body ?? {}, field)) {
+    return undefined;
+  }
+
+  const value = asText(body[field]);
+  if (!value) {
+    return null;
+  }
+
+  return lowercase ? value.toLowerCase() : value;
+}
+
+function validateOptionalName(errors, field, value, { maxLength, lengthMessage, patternMessage }) {
+  if (value === undefined || value === null || value === "") {
+    return;
+  }
+
+  if (value.length < 2 || value.length > maxLength) {
+    errors.push({ field, message: lengthMessage });
+    return;
+  }
+
+  if (!NAME_PATTERN.test(value)) {
+    errors.push({ field, message: patternMessage });
+  }
+}
+
 export function validateUpdateProfile(body) {
   const errors = [];
-<<<<<<< HEAD
-  const fullName = asText(body?.fullName);
-  const displayName = asText(body?.displayName);
-  const firstName = asText(body?.firstName);
-  const lastName = asText(body?.lastName);
-  const email = asText(body?.email).toLowerCase();
-  const phone = asText(body?.phone);
-  const address = asText(body?.address);
-  const avatarUrl = asText(body?.avatarUrl);
-=======
-  const firstName = body?.firstName !== undefined ? asText(body.firstName) : undefined;
-  const lastName = body?.lastName !== undefined ? asText(body.lastName) : undefined;
-  const displayName = body?.displayName !== undefined ? asText(body.displayName) : undefined;
-  const fullName = body?.fullName !== undefined ? asText(body.fullName) : undefined;
-  const email = body?.email !== undefined ? asText(body.email).toLowerCase() : undefined;
-  const phone = body?.phone !== undefined ? asText(body.phone) : undefined;
-  const address = body?.address !== undefined ? asText(body.address) : undefined;
-  const avatarUrl = body?.avatarUrl !== undefined ? asText(body.avatarUrl) : undefined;
->>>>>>> dev
+  const firstName = optionalText(body, "firstName");
+  const lastName = optionalText(body, "lastName");
+  const displayName = optionalText(body, "displayName");
+  const fullName = optionalText(body, "fullName");
+  const email = optionalText(body, "email", { lowercase: true });
+  const phone = optionalText(body, "phone");
+  const address = optionalText(body, "address");
+  const avatarUrl = optionalText(body, "avatarUrl");
 
-  if (firstName !== undefined && firstName !== "") {
-    if (firstName.length < 2 || firstName.length > 50) {
-      errors.push({
-        field: "firstName",
-        message: "กรุณากรอกชื่อจริง 2 ถึง 50 ตัวอักษร",
-      });
-    } else if (!NAME_PATTERN.test(firstName)) {
-      errors.push({
-        field: "firstName",
-        message: "ชื่อจริงต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษเท่านั้น",
-      });
-    }
-  }
+  validateOptionalName(errors, "firstName", firstName, {
+    maxLength: 50,
+    lengthMessage: "กรุณากรอกชื่อจริง 2 ถึง 50 ตัวอักษร",
+    patternMessage: "ชื่อจริงต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษเท่านั้น",
+  });
+  validateOptionalName(errors, "lastName", lastName, {
+    maxLength: 50,
+    lengthMessage: "กรุณากรอกนามสกุล 2 ถึง 50 ตัวอักษร",
+    patternMessage: "นามสกุลต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษเท่านั้น",
+  });
 
-  if (lastName !== undefined && lastName !== "") {
-    if (lastName.length < 2 || lastName.length > 50) {
-      errors.push({
-        field: "lastName",
-        message: "กรุณากรอกนามสกุล 2 ถึง 50 ตัวอักษร",
-      });
-    } else if (!NAME_PATTERN.test(lastName)) {
-      errors.push({
-        field: "lastName",
-        message: "นามสกุลต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษเท่านั้น",
-      });
-    }
-  }
-
+  const primaryNameField = displayName !== undefined ? "displayName" : "fullName";
   const primaryName = displayName !== undefined ? displayName : fullName;
-  if (primaryName !== undefined && primaryName !== "") {
-    if (primaryName.length < 2 || primaryName.length > 80) {
-      errors.push({
-        field: displayName !== undefined ? "displayName" : "fullName",
-        message: "ชื่อที่แสดงต้องมีความยาว 2 ถึง 80 ตัวอักษร",
-      });
-    } else if (!NAME_PATTERN.test(primaryName)) {
-      errors.push({
-        field: displayName !== undefined ? "displayName" : "fullName",
-        message: "ชื่อที่แสดงต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษเท่านั้น",
-      });
-    }
-  }
-
-  for (const [field, label, value, maxLength] of [
-    ["displayName", "ชื่อที่แสดง", displayName, 80],
-    ["firstName", "ชื่อจริง", firstName, 50],
-    ["lastName", "นามสกุล", lastName, 50],
-  ]) {
-    if (value && (value.length < 2 || value.length > maxLength || !NAME_PATTERN.test(value))) {
-      errors.push({
-        field,
-        message: `${label}ต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษ 2 ถึง ${maxLength} ตัวอักษร`,
-      });
-    }
-  }
+  validateOptionalName(errors, primaryNameField, primaryName, {
+    maxLength: 80,
+    lengthMessage: "ชื่อที่แสดงต้องมีความยาว 2 ถึง 80 ตัวอักษร",
+    patternMessage: "ชื่อที่แสดงต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษเท่านั้น",
+  });
 
   if (email && !EMAIL_PATTERN.test(email)) {
     errors.push({
@@ -115,21 +95,14 @@ export function validateUpdateProfile(body) {
   return {
     errors,
     value: {
-<<<<<<< HEAD
-      fullName,
-      displayName: Object.hasOwn(body ?? {}, "displayName") ? displayName || null : undefined,
-      firstName: Object.hasOwn(body ?? {}, "firstName") ? firstName || null : undefined,
-      lastName: Object.hasOwn(body ?? {}, "lastName") ? lastName || null : undefined,
-=======
       firstName,
       lastName,
-      displayName: displayName || fullName,
-      fullName: fullName || displayName,
->>>>>>> dev
-      email: email || null,
-      phone: phone || null,
-      address: address || null,
-      avatarUrl: avatarUrl || null,
+      displayName,
+      fullName,
+      email,
+      phone,
+      address,
+      avatarUrl,
     },
   };
 }

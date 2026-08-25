@@ -159,56 +159,46 @@ export async function createUser({
 }
 
 export async function updateUserProfile(userId, profile) {
-  const resolvedFullName =
-    profile.displayName !== undefined
-      ? profile.displayName
-      : profile.fullName !== undefined
-        ? profile.fullName
-        : profile.firstName && profile.lastName
-          ? `${profile.firstName} ${profile.lastName}`.trim()
-          : null;
+  const hasDisplayName = profile.displayName !== undefined;
+  const hasFullName = profile.fullName !== undefined;
+  const derivedFullName =
+    profile.firstName && profile.lastName
+      ? `${profile.firstName} ${profile.lastName}`.trim()
+      : null;
+  const resolvedFullName = hasDisplayName
+    ? profile.displayName
+    : hasFullName
+      ? profile.fullName
+      : derivedFullName;
 
   const result = await query(
     `
       UPDATE users
       SET
-<<<<<<< HEAD
-        full_name = $2,
-        phone = $3,
-        avatar_url = $4,
-        email = COALESCE($5, email),
-        first_name = CASE WHEN $6 THEN $7 ELSE first_name END,
-        last_name = CASE WHEN $8 THEN $9 ELSE last_name END,
-=======
-        full_name = COALESCE($2, full_name),
-        first_name = COALESCE($3, first_name),
-        last_name = COALESCE($4, last_name),
-        phone = COALESCE($5, phone),
-        avatar_url = COALESCE($6, avatar_url),
-        email = COALESCE($7, email),
->>>>>>> dev
+        full_name = CASE WHEN $2 THEN $3 ELSE full_name END,
+        first_name = CASE WHEN $4 THEN $5 ELSE first_name END,
+        last_name = CASE WHEN $6 THEN $7 ELSE last_name END,
+        phone = CASE WHEN $8 THEN $9 ELSE phone END,
+        avatar_url = CASE WHEN $10 THEN $11 ELSE avatar_url END,
+        email = CASE WHEN $12 THEN $13 ELSE email END,
         updated_at = now()
       WHERE user_id = $1
       RETURNING ${PROFILE_COLUMNS}
     `,
     [
       userId,
-<<<<<<< HEAD
-      profile.displayName ?? profile.fullName,
-      profile.phone,
-      profile.avatarUrl,
-=======
-      resolvedFullName,
-      profile.firstName !== undefined ? profile.firstName : null,
-      profile.lastName !== undefined ? profile.lastName : null,
-      profile.phone !== undefined ? profile.phone : null,
-      profile.avatarUrl !== undefined ? profile.avatarUrl : null,
->>>>>>> dev
-      profile.email || null,
+      hasDisplayName || hasFullName || Boolean(derivedFullName),
+      resolvedFullName || null,
       profile.firstName !== undefined,
       profile.firstName ?? null,
       profile.lastName !== undefined,
       profile.lastName ?? null,
+      profile.phone !== undefined,
+      profile.phone ?? null,
+      profile.avatarUrl !== undefined,
+      profile.avatarUrl ?? null,
+      Boolean(profile.email),
+      profile.email || null,
     ],
   );
 
