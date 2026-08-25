@@ -19,6 +19,7 @@ import dotenv from "dotenv";
 import addressRouter from "./routes/address.routes.mjs";
 import paymentRouter from "./routes/payment.route.mjs";
 import promotionRouter from "./routes/promotion.routes.mjs";
+import orderRouter from "./routes/order.route.mjs";
 
 export const app = express();
 
@@ -50,7 +51,7 @@ app.use("/api/services", serviceRouter);
 app.use("/api/promotions", promotionRouter);      // Changed from "/" to "/api/promotions"
 app.use("/api", addressRouter);                    // Mount at /api for provinces/districts/subdistricts
 app.use("/api/payments", paymentRouter);           // Changed from "/" to "/api/payments"
-app.use("api/orders", orderRouter);
+app.use("/api/orders", orderRouter);               // Orders endpoint
 
 // ============================================
 // 4. USER ROUTES (Auth required)

@@ -71,10 +71,16 @@ http://localhost:3001
 ### Payments
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/api/payments/intent` | ❌ No | Create payment intent ⚠️ |
-| GET | `/api/payments/status/:paymentIntentId` | ❌ No | Get payment status ⚠️ |
+| POST | `/api/payments/intent` | ✅ Yes | Create payment intent |
+| GET | `/api/payments/status/:paymentIntentId` | ✅ Yes | Get payment status |
 
-> ⚠️ **Security Warning**: Payment endpoints should be protected with authentication!
+### Orders
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/orders` | ❌ No | Create new order ⚠️ |
+| POST | `/api/orders/order-item` | ❌ No | Create order item ⚠️ |
+
+> ⚠️ **Security Warning**: Order endpoints should be protected with authentication!
 
 ---
 

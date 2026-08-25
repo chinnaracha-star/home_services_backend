@@ -13,4 +13,8 @@ paymentRouter.post("/intent", protect, createPaymentIntent);
 // GET /api/payments/status/:paymentIntentId - Get payment status (protected - user must be authenticated)
 paymentRouter.get("/status/:paymentIntentId", protect, getPaymentStatus);
 
+
+// POST /api/payment/post - Record created payment to DB
+paymentRouter.post("/post", postPayment);
+
 export default paymentRouter;
