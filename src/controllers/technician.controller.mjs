@@ -2,6 +2,8 @@ import { HttpError } from "../utils/http-error.mjs";
 import {
   validateLocation,
   validateUpdateTechnicianSettings,
+  parsePositiveId,
+  parseTechnicianListQuery,
 } from "../validators/technician.validator.mjs";
 import {
   findActiveServiceIds,
@@ -9,6 +11,13 @@ import {
   updateTechnicianLocation,
   updateTechnicianSettings,
 } from "../repositories/technician.repository.mjs";
+import {
+  acceptOrderForTechnician,
+  declineOrderForTechnician,
+  findAvailableRequests,
+  findTechnicianJob,
+  findTechnicianJobs,
+} from "../repositories/technician-orders.repository.mjs";
 
 function toWorkspaceProfile(settings) {
   return {
@@ -167,39 +176,153 @@ export async function patchMyTechnicianLocation(req, res, next) {
   }
 }
 
+function assignmentError(code) {
+  if (code === "ORDER_ALREADY_ASSIGNED") {
+    return new HttpError(409, code, "คำขอบริการนี้มีช่างรับงานแล้ว");
+  }
+  return new HttpError(404, "ORDER_NOT_FOUND", "ไม่พบคำขอบริการ");
+}
+
 export async function getMyServiceRequests(req, res, next) {
   try {
+    const { errors, value } = parseTechnicianListQuery(req.query);
+    if (errors.length > 0) {
+      throw new HttpError(400, "VALIDATION_ERROR", "ข้อมูลค้นหาไม่ถูกต้อง", errors);
+    }
+
     const settings = await getOwnedTechnicianSettings(req.user.id);
+    const latitude = value.latitude ?? settings.latitude;
+    const longitude = value.longitude ?? settings.longitude;
+
+    if (!settings.isAvailable || latitude == null || longitude == null) {
+      res.status(200).json({
+        message: "Success",
+        data: [],
+        meta: { total: 0, isAvailable: settings.isAvailable },
+      });
+      return;
+    }
+
+    const data = await findAvailableRequests({
+      technicianId: settings.technicianId,
+      latitude,
+      longitude,
+      serviceId: value.serviceId,
+      search: value.search,
+    });
+
     res.status(200).json({
       message: "Success",
-      data: [],
-      meta: { total: 0, isAvailable: settings.isAvailable },
+      data,
+      meta: { total: data.length, isAvailable: settings.isAvailable },
     });
   } catch (error) {
     next(error);
   }
 }
 
-export async function postAcceptServiceRequest(_req, res, next) {
-  next(new HttpError(404, "ORDER_NOT_FOUND", "ไม่พบคำขอบริการ"));
-}
-
-export async function postDeclineServiceRequest(_req, res, next) {
-  next(new HttpError(404, "ORDER_NOT_FOUND", "ไม่พบคำขอบริการ"));
-}
-
-export async function getMyTechnicianJobs(_req, res, next) {
+export async function postAcceptServiceRequest(req, res, next) {
   try {
+    const orderId = parsePositiveId(req.params.orderId);
+    if (!orderId) {
+      throw new HttpError(404, "ORDER_NOT_FOUND", "ไม่พบคำขอบริการ");
+    }
+
+    const settings = await getOwnedTechnicianSettings(req.user.id);
+    if (!settings.isAvailable) {
+      throw new HttpError(403, "TECHNICIAN_UNAVAILABLE", "กรุณาเปิดสถานะพร้อมรับบริการก่อนรับงาน");
+    }
+
+    const result = await acceptOrderForTechnician({
+      technicianId: settings.technicianId,
+      orderId,
+    });
+    if (result.error) throw assignmentError(result.error);
+
+    const job = await findTechnicianJob({
+      technicianId: settings.technicianId,
+      assignmentId: result.assignmentId,
+    });
+
     res.status(200).json({
-      message: "Success",
-      data: [],
-      meta: { total: 0 },
+      message: "รับงานสำเร็จ",
+      data: job,
     });
   } catch (error) {
     next(error);
   }
 }
 
-export async function getMyTechnicianJob(_req, res, next) {
-  next(new HttpError(404, "JOB_NOT_FOUND", "ไม่พบงานที่ต้องการ"));
+export async function postDeclineServiceRequest(req, res, next) {
+  try {
+    const orderId = parsePositiveId(req.params.orderId);
+    if (!orderId) {
+      throw new HttpError(404, "ORDER_NOT_FOUND", "ไม่พบคำขอบริการ");
+    }
+
+    const settings = await getOwnedTechnicianSettings(req.user.id);
+    const result = await declineOrderForTechnician({
+      technicianId: settings.technicianId,
+      orderId,
+    });
+    if (result.error) throw assignmentError(result.error);
+
+    res.status(200).json({
+      message: "ปฏิเสธงานสำเร็จ",
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getMyTechnicianJobs(req, res, next) {
+  try {
+    const { errors, value } = parseTechnicianListQuery(req.query);
+    if (errors.length > 0) {
+      throw new HttpError(400, "VALIDATION_ERROR", "ข้อมูลค้นหาไม่ถูกต้อง", errors);
+    }
+
+    const settings = await getOwnedTechnicianSettings(req.user.id);
+    const data = await findTechnicianJobs({
+      technicianId: settings.technicianId,
+      serviceId: value.serviceId,
+      search: value.search,
+      sort: value.sort,
+      status: value.status,
+    });
+
+    res.status(200).json({
+      message: "Success",
+      data,
+      meta: { total: data.length },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getMyTechnicianJob(req, res, next) {
+  try {
+    const assignmentId = parsePositiveId(req.params.assignmentId);
+    if (!assignmentId) {
+      throw new HttpError(404, "JOB_NOT_FOUND", "ไม่พบงานที่ต้องการ");
+    }
+
+    const settings = await getOwnedTechnicianSettings(req.user.id);
+    const job = await findTechnicianJob({
+      technicianId: settings.technicianId,
+      assignmentId,
+    });
+    if (!job) {
+      throw new HttpError(404, "JOB_NOT_FOUND", "ไม่พบงานที่ต้องการ");
+    }
+
+    res.status(200).json({
+      message: "Success",
+      data: job,
+    });
+  } catch (error) {
+    next(error);
+  }
 }

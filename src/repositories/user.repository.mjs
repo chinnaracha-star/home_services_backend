@@ -4,6 +4,9 @@ const PROFILE_COLUMNS = `
   user_id AS id,
   email,
   COALESCE(full_name, CONCAT(first_name, ' ', last_name), username) AS "fullName",
+  COALESCE(full_name, CONCAT(first_name, ' ', last_name), username) AS "displayName",
+  first_name AS "firstName",
+  last_name AS "lastName",
   phone,
   NULL AS address,
   avatar_url AS "avatarUrl",
@@ -64,16 +67,22 @@ export async function updateUserProfile(userId, profile) {
         phone = $3,
         avatar_url = $4,
         email = COALESCE($5, email),
+        first_name = CASE WHEN $6 THEN $7 ELSE first_name END,
+        last_name = CASE WHEN $8 THEN $9 ELSE last_name END,
         updated_at = now()
       WHERE user_id = $1
       RETURNING ${PROFILE_COLUMNS}
     `,
     [
       userId,
-      profile.fullName,
+      profile.displayName ?? profile.fullName,
       profile.phone,
       profile.avatarUrl,
       profile.email || null,
+      profile.firstName !== undefined,
+      profile.firstName ?? null,
+      profile.lastName !== undefined,
+      profile.lastName ?? null,
     ],
   );
 

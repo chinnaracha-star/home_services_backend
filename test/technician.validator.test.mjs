@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateUpdateTechnicianSettings } from "../src/validators/technician.validator.mjs";
+import { validateUpdateTechnicianSettings, parsePositiveId, parseTechnicianListQuery } from "../src/validators/technician.validator.mjs";
 
 const validSettings = {
   firstName: "สมาน",
@@ -52,4 +52,29 @@ test("rejects invalid service ids", () => {
   });
 
   assert.ok(errors.some((error) => error.field === "serviceIds"));
+});
+
+test("parses request list query and positive ids", () => {
+  assert.equal(parsePositiveId("101"), 101);
+  assert.equal(parsePositiveId("abc"), null);
+
+  const { errors, value } = parseTechnicianListQuery({
+    search: "HS-1",
+    sort: "nearest",
+    latitude: "18.7964",
+    longitude: "98.9673",
+    serviceId: "3",
+  });
+
+  assert.equal(errors.length, 0);
+  assert.equal(value.search, "HS-1");
+  assert.equal(value.sort, "nearest");
+  assert.equal(value.serviceId, 3);
+  assert.equal(value.latitude, 18.7964);
+  assert.equal(value.longitude, 98.9673);
+});
+
+test("rejects an invalid sort value", () => {
+  const { errors } = parseTechnicianListQuery({ sort: "far" });
+  assert.ok(errors.some((error) => error.field === "sort"));
 });

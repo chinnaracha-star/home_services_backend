@@ -130,6 +130,49 @@ ALTER TABLE technicians ADD COLUMN IF NOT EXISTS current_latitude NUMERIC(9, 6);
 ALTER TABLE technicians ADD COLUMN IF NOT EXISTS current_longitude NUMERIC(9, 6);
 ALTER TABLE technicians ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ;
 
+CREATE TABLE IF NOT EXISTS orders (
+  order_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id BIGINT,
+  service_id BIGINT,
+  promotion_id BIGINT,
+  status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+  address TEXT,
+  total_price NUMERIC,
+  discount NUMERIC DEFAULT 0,
+  subtotal NUMERIC,
+  create_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  update_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_code TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_latitude NUMERIC(9, 6);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_longitude NUMERIC(9, 6);
+
+CREATE TABLE IF NOT EXISTS order_item (
+  item_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  order_id BIGINT NOT NULL,
+  option_id BIGINT,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  unit_price NUMERIC
+);
+
+CREATE TABLE IF NOT EXISTS order_assignment (
+  assignment_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  order_id BIGINT NOT NULL,
+  technician_id BIGINT NOT NULL,
+  status VARCHAR(50) NOT NULL,
+  assigned_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS order_assignment_order_technician_uidx
+  ON order_assignment (order_id, technician_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS order_assignment_one_active_uidx
+  ON order_assignment (order_id)
+  WHERE status IN ('ACCEPTED', 'IN_PROGRESS');
+
 INSERT INTO storage.buckets (
   id,
   name,
