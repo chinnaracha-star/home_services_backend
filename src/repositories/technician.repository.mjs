@@ -53,7 +53,10 @@ export async function findTechnicianSettingsByUserId(userId) {
         users.phone,
         technician.technician_id AS "technicianId",
         technician.address,
-        technician.is_available AS "isAvailable"
+        technician.is_available AS "isAvailable",
+        technician.current_latitude::float8 AS latitude,
+        technician.current_longitude::float8 AS longitude,
+        technician.location_updated_at AS "locationUpdatedAt"
       FROM users
       JOIN technicians technician ON technician.user_id = users.user_id
       WHERE users.user_id = $1
@@ -99,9 +102,9 @@ export async function findTechnicianSettingsByUserId(userId) {
       id: String(skill.id),
       name: skill.name,
     })),
-    latitude: null,
-    longitude: null,
-    locationUpdatedAt: null,
+    latitude: row.latitude ?? null,
+    longitude: row.longitude ?? null,
+    locationUpdatedAt: row.locationUpdatedAt ?? null,
   };
 }
 

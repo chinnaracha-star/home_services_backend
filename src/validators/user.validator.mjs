@@ -8,6 +8,16 @@ function asText(value) {
 
 export function validateUpdateProfile(body) {
   const errors = [];
+<<<<<<< HEAD
+  const fullName = asText(body?.fullName);
+  const displayName = asText(body?.displayName);
+  const firstName = asText(body?.firstName);
+  const lastName = asText(body?.lastName);
+  const email = asText(body?.email).toLowerCase();
+  const phone = asText(body?.phone);
+  const address = asText(body?.address);
+  const avatarUrl = asText(body?.avatarUrl);
+=======
   const firstName = body?.firstName !== undefined ? asText(body.firstName) : undefined;
   const lastName = body?.lastName !== undefined ? asText(body.lastName) : undefined;
   const displayName = body?.displayName !== undefined ? asText(body.displayName) : undefined;
@@ -16,6 +26,7 @@ export function validateUpdateProfile(body) {
   const phone = body?.phone !== undefined ? asText(body.phone) : undefined;
   const address = body?.address !== undefined ? asText(body.address) : undefined;
   const avatarUrl = body?.avatarUrl !== undefined ? asText(body.avatarUrl) : undefined;
+>>>>>>> dev
 
   if (firstName !== undefined && firstName !== "") {
     if (firstName.length < 2 || firstName.length > 50) {
@@ -60,6 +71,19 @@ export function validateUpdateProfile(body) {
     }
   }
 
+  for (const [field, label, value, maxLength] of [
+    ["displayName", "ชื่อที่แสดง", displayName, 80],
+    ["firstName", "ชื่อจริง", firstName, 50],
+    ["lastName", "นามสกุล", lastName, 50],
+  ]) {
+    if (value && (value.length < 2 || value.length > maxLength || !NAME_PATTERN.test(value))) {
+      errors.push({
+        field,
+        message: `${label}ต้องเป็นตัวอักษรภาษาไทยหรืออังกฤษ 2 ถึง ${maxLength} ตัวอักษร`,
+      });
+    }
+  }
+
   if (email && !EMAIL_PATTERN.test(email)) {
     errors.push({
       field: "email",
@@ -91,10 +115,17 @@ export function validateUpdateProfile(body) {
   return {
     errors,
     value: {
+<<<<<<< HEAD
+      fullName,
+      displayName: Object.hasOwn(body ?? {}, "displayName") ? displayName || null : undefined,
+      firstName: Object.hasOwn(body ?? {}, "firstName") ? firstName || null : undefined,
+      lastName: Object.hasOwn(body ?? {}, "lastName") ? lastName || null : undefined,
+=======
       firstName,
       lastName,
       displayName: displayName || fullName,
       fullName: fullName || displayName,
+>>>>>>> dev
       email: email || null,
       phone: phone || null,
       address: address || null,
