@@ -336,6 +336,7 @@ export async function findTechnicianJobs({ technicianId, serviceId, search, sort
   }
 
   let orderBy = "assignment.assigned_at DESC NULLS LAST";
+  if (sort === "newest") orderBy = "assignment.assigned_at DESC NULLS LAST";
   if (sort === "oldest") orderBy = "assignment.assigned_at ASC NULLS LAST";
   if (sort === "nearest") orderBy = "orders.scheduled_at ASC NULLS LAST";
 

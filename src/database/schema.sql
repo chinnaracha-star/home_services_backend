@@ -237,8 +237,6 @@ BEGIN
       );
   END IF;
 END $$;
-<<<<<<< HEAD
-=======
 
 -- Two-way Delete Sync Triggers between public.users and auth.users
 CREATE OR REPLACE FUNCTION delete_auth_user_on_public_delete()
@@ -276,4 +274,3 @@ CREATE TRIGGER tr_delete_public_user_on_auth_delete
 AFTER DELETE ON auth.users
 FOR EACH ROW
 EXECUTE FUNCTION delete_public_user_on_auth_delete();
->>>>>>> dev
