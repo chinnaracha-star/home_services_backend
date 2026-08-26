@@ -53,7 +53,10 @@ export async function findTechnicianSettingsByUserId(userId) {
         users.phone,
         technician.technician_id AS "technicianId",
         technician.address,
-        technician.is_available AS "isAvailable"
+        technician.is_available AS "isAvailable",
+        technician.current_latitude::float8 AS latitude,
+        technician.current_longitude::float8 AS longitude,
+        technician.location_updated_at AS "locationUpdatedAt"
       FROM users
       JOIN technicians technician ON technician.user_id = users.user_id
       WHERE users.user_id = $1
@@ -99,9 +102,9 @@ export async function findTechnicianSettingsByUserId(userId) {
       id: String(skill.id),
       name: skill.name,
     })),
-    latitude: null,
-    longitude: null,
-    locationUpdatedAt: null,
+    latitude: row.latitude ?? null,
+    longitude: row.longitude ?? null,
+    locationUpdatedAt: row.locationUpdatedAt ?? null,
   };
 }
 
@@ -201,4 +204,66 @@ export async function updateTechnicianLocation(userId, { latitude, longitude }) 
     }
     throw error;
   }
+}
+
+export async function findTechnicianJobs(
+  technicianId,
+  { sort = "oldest" } = {},
+) {
+  const scheduledAt = `
+   (orders.scheduled_date + orders.scheduled_time)
+   AT TIME ZONE 'Asia/Bangkok'
+  `;
+  let orderBy;
+
+  switch (sort) {
+    case "nearest":
+      orderBy = `
+        ORDER BY
+          CASE WHEN ${scheduledAt} >= NOW() THEN 0 ELSE 1 END,
+          ABS(EXTRACT(EPOCH FROM ${scheduledAt} - NOW())) ASC,
+          assignment.assignment_id ASC
+      `;
+      break;
+  
+    case "newest":
+      orderBy = `
+        ORDER BY
+          orders.scheduled_date DESC,
+          orders.scheduled_time DESC,
+          assignment.assignment_id DESC
+      `;
+      break;
+  
+    case "oldest":
+    default:
+      orderBy = `
+        ORDER BY
+          orders.scheduled_date ASC,
+          orders.scheduled_time ASC,
+          assignment.assignment_id ASC
+      `;
+  }
+
+  const result = await query(
+    `
+      SELECT
+        assignment.assignment_id::text AS id,
+        orders.order_id::text AS "orderId",
+        orders.status,
+        orders.scheduled_date AS "scheduledDate",
+        orders.scheduled_time AS "scheduledTime",
+        orders.total_price::float8 AS "totalPrice",
+        orders.address,
+        services.service_name AS "serviceName"
+      FROM order_assignment assignment
+      JOIN orders ON orders.order_id = assignment.order_id
+      JOIN services ON services.service_id = orders.service_id
+      WHERE assignment.technician_id = $1
+      ${orderBy}
+    `,
+    [technicianId],
+  );
+
+  return result.rows;
 }
