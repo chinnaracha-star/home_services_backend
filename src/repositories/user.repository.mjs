@@ -1,6 +1,9 @@
 import { query } from "../configs/db.mjs";
 import { HttpError } from "../utils/http-error.mjs";
-import { nextAvailableUsername, usernameFromEmail } from "../utils/username.mjs";
+import {
+  nextAvailableUsername,
+  usernameFromEmail,
+} from "../utils/username.mjs";
 
 const PROFILE_COLUMNS = `
   user_id AS id,
@@ -51,7 +54,10 @@ async function allocateUniqueUsername(preferred) {
     [base],
   );
 
-  return nextAvailableUsername(base, result.rows.map((row) => row.username));
+  return nextAvailableUsername(
+    base,
+    result.rows.map((row) => row.username),
+  );
 }
 
 function isUniqueViolation(error, column) {
@@ -141,7 +147,9 @@ export async function createUser({
     }
 
     if (isUniqueViolation(error, "username")) {
-      uname = await allocateUniqueUsername(`${preferred}_${Date.now().toString(36)}`);
+      uname = await allocateUniqueUsername(
+        `${preferred}_${Date.now().toString(36)}`,
+      );
       return insertUser({
         username: uname,
         password,
@@ -171,44 +179,33 @@ export async function updateUserProfile(userId, profile) {
   const result = await query(
     `
       UPDATE users
-      SET
-<<<<<<< HEAD
-        full_name = $2,
-        phone = $3,
-        avatar_url = $4,
-        email = COALESCE($5, email),
-        first_name = CASE WHEN $6 THEN $7 ELSE first_name END,
-        last_name = CASE WHEN $8 THEN $9 ELSE last_name END,
-=======
-        full_name = COALESCE($2, full_name),
-        first_name = COALESCE($3, first_name),
-        last_name = COALESCE($4, last_name),
-        phone = COALESCE($5, phone),
-        avatar_url = COALESCE($6, avatar_url),
-        email = COALESCE($7, email),
->>>>>>> dev
-        updated_at = now()
-      WHERE user_id = $1
-      RETURNING ${PROFILE_COLUMNS}
+SET
+  full_name = COALESCE($2, full_name),
+  first_name = COALESCE($3, first_name),
+  last_name = COALESCE($4, last_name),
+  phone = COALESCE($5, phone),
+  avatar_url = COALESCE($6, avatar_url),
+  email = COALESCE($7, email),
+  updated_at = now()
+
+WHERE user_id = $1
+
+RETURNING ${PROFILE_COLUMNS}
     `,
     [
       userId,
-<<<<<<< HEAD
-      profile.displayName ?? profile.fullName,
-      profile.phone,
-      profile.avatarUrl,
-=======
-      resolvedFullName,
+
+      profile.displayName ?? profile.fullName ?? null,
+
       profile.firstName !== undefined ? profile.firstName : null,
+
       profile.lastName !== undefined ? profile.lastName : null,
+
       profile.phone !== undefined ? profile.phone : null,
+
       profile.avatarUrl !== undefined ? profile.avatarUrl : null,
->>>>>>> dev
+
       profile.email || null,
-      profile.firstName !== undefined,
-      profile.firstName ?? null,
-      profile.lastName !== undefined,
-      profile.lastName ?? null,
     ],
   );
 
