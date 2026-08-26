@@ -9,6 +9,6 @@ const promotionRouter = Router();
 promotionRouter.get("/", getPromotionController);
 
 // PUT /api/promotions/:id/quota - Update promotion quota (protected - user must be authenticated)
-promotionRouter.put("/:id/quota", protect, validateIdParam, updatePromotionQuotaController);
+promotionRouter.put("/:id/quota", updatePromotionQuotaController);
 
 export default promotionRouter;

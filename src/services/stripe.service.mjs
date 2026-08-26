@@ -7,11 +7,8 @@ export async function createToStripe(amount) {
     
     const response = await stripe.paymentIntents.create({
         amount: amount,
-        currency: "usd",
-
-        automatic_payment_methods: {
-            enabled: true
-        }
+        currency: "thb",
+        payment_method_types: ["card"]
         });
 
     return response

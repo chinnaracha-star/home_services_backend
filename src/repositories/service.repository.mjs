@@ -79,7 +79,7 @@ export async function findServiceOptions(serviceId) {
 export async function getServiceOptionRepository(serviceId) {
   const result = await query(
     `
-    SELECT s.service_id, s.service_name, so.option_name, so.price, so.unit
+    SELECT s.service_id, s.service_name, so.option_id, so.option_name, so.price, so.unit
     FROM services AS s
     INNER JOIN service_options AS so
     ON s.service_id = so.service_id
