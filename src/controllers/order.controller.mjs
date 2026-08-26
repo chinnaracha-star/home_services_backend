@@ -1,10 +1,35 @@
-import { postOrderService, postOrderItemService } from "../services/order.service.mjs";
+import { checkoutService, postOrderService, postOrderItemService } from "../services/order.service.mjs";
+
+function hasValue(value) {
+    return value !== undefined && value !== null && value !== "";
+}
+
+export async function checkoutController(req, res) {
+    try {
+        const result = await checkoutService(req.body);
+
+        return res.status(201).json({
+            message: "Checkout recorded successfully",
+            data: result,
+        });
+    } catch (error) {
+        const status = error.statusCode || 500;
+        const stage = error.stage || "checkout";
+
+        console.error(`Checkout failed during ${stage}:`, error);
+        return res.status(status).json({
+            message: error.message || "Server could not record checkout",
+            code: error.code || "CHECKOUT_FAILED",
+            stage,
+        });
+    }
+}
 
 export async function postOrderController(req, res) {
     try {
         // Validate required fields
         const requiredFields = ['userId', 'serviceId', 'status', 'totAmount', 'serviceDate', 'serviceTime', 'adress', 'province', 'district', 'subdistrict'];
-        const missingFields = requiredFields.filter(field => !req.body[field]);
+        const missingFields = requiredFields.filter(field => !hasValue(req.body[field]));
         
         if (missingFields.length > 0) {
             return res.status(400).json({
@@ -56,7 +81,7 @@ export async function postOrderItemController(req, res) {
     try {
         // Validate required fields
         const requiredFields = ['option_id', 'order_id', 'quantity', 'price'];
-        const missingFields = requiredFields.filter(field => !req.body[field]);
+        const missingFields = requiredFields.filter(field => !hasValue(req.body[field]));
         
         if (missingFields.length > 0) {
             return res.status(400).json({

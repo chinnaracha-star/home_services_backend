@@ -5,12 +5,12 @@ async function addMissingColumns() {
 
   const columnsToAdd = [
     {
-      name: "schedule_date",
+      name: "scheduled_date",
       definition: "DATE",
       description: "Service schedule date"
     },
     {
-      name: "schedule_time",
+      name: "scheduled_time",
       definition: "TIME",
       description: "Service schedule time"
     },

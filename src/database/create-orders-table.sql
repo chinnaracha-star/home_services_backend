@@ -5,8 +5,8 @@ CREATE TABLE IF NOT EXISTS orders (
   service_id BIGINT NOT NULL,
   status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'in_progress', 'completed', 'cancelled')),
   total_price NUMERIC(10, 2) NOT NULL,
-  schedule_date DATE NOT NULL,
-  schedule_time TIME NOT NULL,
+  scheduled_date DATE NOT NULL,
+  scheduled_time TIME NOT NULL,
   address TEXT NOT NULL,
   province VARCHAR(255) NOT NULL,
   district VARCHAR(255) NOT NULL,
@@ -78,7 +78,7 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_service_id ON orders(service_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_orders_schedule_date ON orders(schedule_date);
+CREATE INDEX IF NOT EXISTS idx_orders_scheduled_date ON orders(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 
 -- Create updated_at trigger function if not exists

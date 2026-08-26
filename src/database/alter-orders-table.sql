@@ -3,31 +3,31 @@
 -- ============================================
 -- Run this if you already have an orders table that's missing columns
 
--- Add schedule_date column if it doesn't exist
+-- Add scheduled_date column if it doesn't exist
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'orders' AND column_name = 'schedule_date'
+    WHERE table_name = 'orders' AND column_name = 'scheduled_date'
   ) THEN
-    ALTER TABLE orders ADD COLUMN schedule_date DATE;
-    RAISE NOTICE 'Added schedule_date column';
+    ALTER TABLE orders ADD COLUMN scheduled_date DATE;
+    RAISE NOTICE 'Added scheduled_date column';
   ELSE
-    RAISE NOTICE 'schedule_date column already exists';
+    RAISE NOTICE 'scheduled_date column already exists';
   END IF;
 END $$;
 
--- Add schedule_time column if it doesn't exist
+-- Add scheduled_time column if it doesn't exist
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'orders' AND column_name = 'schedule_time'
+    WHERE table_name = 'orders' AND column_name = 'scheduled_time'
   ) THEN
-    ALTER TABLE orders ADD COLUMN schedule_time TIME;
-    RAISE NOTICE 'Added schedule_time column';
+    ALTER TABLE orders ADD COLUMN scheduled_time TIME;
+    RAISE NOTICE 'Added scheduled_time column';
   ELSE
-    RAISE NOTICE 'schedule_time column already exists';
+    RAISE NOTICE 'scheduled_time column already exists';
   END IF;
 END $$;
 
@@ -198,7 +198,7 @@ BEGIN
   FROM (
     SELECT unnest(ARRAY[
       'order_id', 'user_id', 'service_id', 'status', 'total_price',
-      'schedule_date', 'schedule_time', 'address', 'province', 'district',
+      'scheduled_date', 'scheduled_time', 'address', 'province', 'district',
       'subdistrict', 'additional_info', 'promotion_id', 'discount',
       'created_at', 'updated_at'
     ]) AS col
