@@ -4,7 +4,7 @@ export async function postPaymentRepository(paymentData) {
     const {order_id, payment_method, payment_status, amount} = paymentData;
     
     const queryText = `
-      INSERT INTO order_item (order_id, payment_method, payment_status, amount)
+      INSERT INTO payment (order_id, payment_method, payment_status, amount)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `;

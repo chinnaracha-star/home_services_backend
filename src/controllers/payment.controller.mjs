@@ -75,9 +75,12 @@ export async function getPaymentStatus(req, res) {
 
 export async function postPaymentController(req, res) {
     try {
-        // Validate required fields
-        const requiredFields = ['order_id', 'payment_method', 'payment_status','amount'];
-        const missingFields = requiredFields.filter(field => !req.body[field]);
+        const { order_id, paymentMethod, paymentStatus, amount } = req.body;
+
+        const requiredFields = ['order_id', 'paymentMethod', 'paymentStatus', 'amount'];
+        const missingFields = requiredFields.filter(field =>
+            req.body[field] === undefined || req.body[field] === null || req.body[field] === ''
+        );
         
         if (missingFields.length > 0) {
             return res.status(400).json({
@@ -90,11 +93,32 @@ export async function postPaymentController(req, res) {
             });
         }
 
+        if (!Number.isSafeInteger(order_id) || order_id <= 0) {
+            return res.status(400).json({
+                message: "order_id must be a positive whole number",
+                code: "INVALID_ORDER_ID"
+            });
+        }
+
+        if (typeof paymentMethod !== 'string' || typeof paymentStatus !== 'string') {
+            return res.status(400).json({
+                message: "paymentMethod and paymentStatus must be strings",
+                code: "INVALID_PAYMENT_DATA"
+            });
+        }
+
+        if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({
+                message: "amount must be a positive number",
+                code: "INVALID_AMOUNT"
+            });
+        }
+
         const paymentData = {
-            order_id: req.body.order_id,
-            payment_method: req.body.paymentMethod,
-            payment_status: req.body.paymentStatus,
-            amount: req.body.totAmount
+            order_id,
+            payment_method: paymentMethod,
+            payment_status: paymentStatus,
+            amount
         };
 
         const result = await postPaymentService(paymentData);

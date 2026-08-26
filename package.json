@@ -8,6 +8,7 @@
     "start": "node src/server.mjs",
     "db:ping": "node src/scripts/ping-db.mjs",
     "db:migrate": "node src/scripts/migrate.mjs",
+    "db:create-payments": "node src/scripts/create-payments-table.mjs",
     "db:seed-technician": "node src/scripts/seed-technician.mjs",
     "db:fix-orders": "node src/scripts/add-orders-columns.mjs",
     "test": "node --test"

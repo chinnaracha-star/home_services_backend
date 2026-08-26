@@ -228,6 +228,17 @@ CREATE TABLE IF NOT EXISTS order_items (
   CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
 );
 
+-- Payments are separate from order_items, which represent selected service options.
+CREATE TABLE IF NOT EXISTS payments (
+  payment_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  order_id BIGINT NOT NULL,
+  payment_method VARCHAR(100) NOT NULL,
+  payment_status VARCHAR(50) NOT NULL,
+  amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
+);
+
 -- Add foreign key constraints for orders
 DO $$
 BEGIN
@@ -258,6 +269,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_service_id ON orders(service_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_schedule_date ON orders(schedule_date);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
 
 -- Create updated_at trigger function if not exists
 CREATE OR REPLACE FUNCTION update_updated_at_column()
