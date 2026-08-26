@@ -2,3 +2,8 @@ node_modules/
 .env
 coverage/
 *.log
+
+# local notes (ไม่ขึ้น GitHub)
+note-md/
+notes/
+DAILY_NOTE/
