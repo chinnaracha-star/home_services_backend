@@ -7,7 +7,6 @@ import {
 } from "../validators/technician.validator.mjs";
 import {
   findActiveServiceIds,
-  findTechnicianJobs,
   findTechnicianSettingsByUserId,
   updateTechnicianLocation,
   updateTechnicianSettings,
@@ -17,6 +16,7 @@ import {
   declineOrderForTechnician,
   findAvailableRequests,
   findTechnicianJob,
+  findTechnicianJobs,
 } from "../repositories/technician-orders.repository.mjs";
 
 function toWorkspaceProfile(settings) {
