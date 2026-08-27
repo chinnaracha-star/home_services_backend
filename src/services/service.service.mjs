@@ -2,6 +2,7 @@ import {
   findServiceById,
   findServiceOptions,
   findServices,
+  getServiceOptionRepository
 } from "../repositories/service.repository.mjs";
 import {
   parseServiceId,
@@ -28,4 +29,16 @@ export async function getService(serviceId) {
     ...service,
     serviceOptions: await findServiceOptions(id),
   };
+}
+
+// for service option
+export async function getServiceOptionService(serviceId) {
+  const result = await getServiceOptionRepository(serviceId);
+      
+  if(!result) {
+      throw new Error("ServieId not found");   
+  }
+
+  return result
+
 }
