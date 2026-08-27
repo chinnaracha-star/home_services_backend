@@ -102,6 +102,10 @@ export function validateUpdateTechnicianSettings(body) {
 export function validateLocation(body = {}) {
   const latitude = Number(body.latitude);
   const longitude = Number(body.longitude);
+  const address =
+    body?.address === undefined || body?.address === null
+      ? undefined
+      : asText(body.address);
   const errors = [];
 
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
@@ -110,8 +114,18 @@ export function validateLocation(body = {}) {
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     errors.push({ field: "longitude", message: "longitude ต้องอยู่ระหว่าง -180 ถึง 180" });
   }
+  if (address !== undefined && address.length > 500) {
+    errors.push({ field: "address", message: "ที่อยู่ต้องไม่เกิน 500 ตัวอักษร" });
+  }
 
-  return { errors, value: { latitude, longitude } };
+  return {
+    errors,
+    value: {
+      latitude,
+      longitude,
+      ...(address !== undefined ? { address } : {}),
+    },
+  };
 }
 
 export function parsePositiveId(value) {

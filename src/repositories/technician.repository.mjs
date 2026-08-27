@@ -175,8 +175,12 @@ export async function updateTechnicianSettings(userId, technicianId, settings) {
   return findTechnicianSettingsByUserId(userId);
 }
 
-export async function updateTechnicianLocation(userId, { latitude, longitude }) {
+export async function updateTechnicianLocation(
+  userId,
+  { latitude, longitude, address },
+) {
   try {
+    const hasAddress = address !== undefined;
     const result = await query(
       `
         UPDATE technicians
@@ -185,13 +189,17 @@ export async function updateTechnicianLocation(userId, { latitude, longitude }) 
           current_longitude = $3,
           location_updated_at = now(),
           updated_at = now()
+          ${hasAddress ? ", address = $4" : ""}
         WHERE user_id = $1
         RETURNING
           current_latitude::float8 AS latitude,
           current_longitude::float8 AS longitude,
           location_updated_at AS "locationUpdatedAt"
+          ${hasAddress ? ", address" : ""}
       `,
-      [userId, latitude, longitude],
+      hasAddress
+        ? [userId, latitude, longitude, address]
+        : [userId, latitude, longitude],
     );
     return result.rows[0] ?? null;
   } catch (error) {
@@ -200,6 +208,7 @@ export async function updateTechnicianLocation(userId, { latitude, longitude }) 
         latitude,
         longitude,
         locationUpdatedAt: new Date().toISOString(),
+        ...(address !== undefined ? { address } : {}),
       };
     }
     throw error;

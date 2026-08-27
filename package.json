@@ -27,7 +27,7 @@
   "homepage": "https://github.com/chinnaracha-star/home_services_backend#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
-    "axios": "^1.19.0",
+    "axios": "^1.20.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
