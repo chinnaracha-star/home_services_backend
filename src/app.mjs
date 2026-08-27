@@ -13,8 +13,10 @@ import authRouter from "./routes/auth.route.mjs";
 import { userAuthRouter } from "./routes/user-auth.route.mjs";
 import { technicianAuthRouter } from "./routes/technician-auth.route.mjs";
 import { technicianRouter } from "./routes/technician.route.mjs";
+import { reviewRouter } from "./routes/review.route.mjs";
 
 export const app = express();
+
 
 app.use(
   cors({
@@ -41,6 +43,9 @@ app.use("/auth/technician", technicianAuthRouter);
 app.use("/api/auth/technician", technicianAuthRouter);
 app.use("/auth", authRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/reviews", reviewRouter);
+app.use("/reviews", reviewRouter);
+
 
 app.use((error, _req, res, _next) => {
   if (error?.code === "LIMIT_FILE_SIZE") {

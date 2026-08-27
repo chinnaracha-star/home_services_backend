@@ -231,3 +231,41 @@ CREATE TRIGGER tr_delete_public_user_on_auth_delete
 AFTER DELETE ON auth.users
 FOR EACH ROW
 EXECUTE FUNCTION delete_public_user_on_auth_delete();
+
+CREATE TABLE IF NOT EXISTS reviews (
+  review_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  order_code VARCHAR(100) NOT NULL,
+  order_id BIGINT,
+  user_id BIGINT,
+  user_email VARCHAR(255),
+  user_name VARCHAR(255),
+  service_id BIGINT,
+  service_name VARCHAR(255),
+  technician_id BIGINT,
+  technician_name VARCHAR(255),
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_order_code ON reviews(order_code);
+CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_service_id ON reviews(service_id);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'reviews_user_id_fkey') THEN
+    ALTER TABLE reviews ADD CONSTRAINT reviews_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'reviews_service_id_fkey') THEN
+    ALTER TABLE reviews ADD CONSTRAINT reviews_service_id_fkey FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'reviews_technician_id_fkey') THEN
+    ALTER TABLE reviews ADD CONSTRAINT reviews_technician_id_fkey FOREIGN KEY (technician_id) REFERENCES technicians(technician_id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'reviews_order_id_fkey') THEN
+    ALTER TABLE reviews ADD CONSTRAINT reviews_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
