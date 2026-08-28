@@ -367,3 +367,68 @@ CREATE TRIGGER update_orders_updated_at
     BEFORE UPDATE ON orders
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- CHAT
+-- ============================================
+CREATE TABLE IF NOT EXISTS chat_rooms (
+  room_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  room_type VARCHAR(20) NOT NULL CHECK (room_type IN ('SUPPORT', 'ORDER')),
+  customer_id BIGINT NOT NULL,
+  order_id BIGINT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (
+    (room_type = 'SUPPORT' AND order_id IS NULL)
+    OR (room_type = 'ORDER' AND order_id IS NOT NULL)
+  )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS chat_rooms_support_customer_uidx
+  ON chat_rooms (customer_id) WHERE room_type = 'SUPPORT';
+CREATE UNIQUE INDEX IF NOT EXISTS chat_rooms_order_uidx
+  ON chat_rooms (order_id) WHERE room_type = 'ORDER';
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  message_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  room_id BIGINT NOT NULL REFERENCES chat_rooms(room_id) ON DELETE CASCADE,
+  sender_id BIGINT NOT NULL,
+  content VARCHAR(2000) NOT NULL CHECK (char_length(trim(content)) > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS chat_messages_room_created_idx
+  ON chat_messages (room_id, created_at DESC);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'user_id'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chat_rooms_customer_id_fkey'
+  ) THEN
+    ALTER TABLE chat_rooms
+      ADD CONSTRAINT chat_rooms_customer_id_fkey
+      FOREIGN KEY (customer_id) REFERENCES users(user_id) ON DELETE CASCADE;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'user_id'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chat_messages_sender_id_fkey'
+  ) THEN
+    ALTER TABLE chat_messages
+      ADD CONSTRAINT chat_messages_sender_id_fkey
+      FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chat_rooms_order_id_fkey'
+  ) THEN
+    ALTER TABLE chat_rooms
+      ADD CONSTRAINT chat_rooms_order_id_fkey
+      FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE;
+  END IF;
+END $$;
