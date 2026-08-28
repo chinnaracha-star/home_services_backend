@@ -46,16 +46,66 @@ export async function createReview(req, res, next) {
     const userEmail = req.user?.email || null;
     const userName = req.user?.fullName || req.user?.displayName || bodyUserName || null;
 
+    // Auto-resolve serviceId if missing by querying orders table or services table
+    let resolvedServiceId = serviceId || null;
+    let resolvedServiceName = serviceName || null;
+    let resolvedTechnicianId = technicianId || null;
+    let resolvedTechnicianName = technicianName || null;
+
+    if (!resolvedServiceId && (orderCode || orderId)) {
+      try {
+        const orderRes = await findReviewByOrderCode(orderCode || orderId);
+        // Try to query orders table directly
+        const { query: dbQuery } = await import("../configs/db.mjs");
+        const orderLookup = await dbQuery(
+          `SELECT 
+             orders.service_id AS "serviceId", 
+             services.service_name AS "serviceName",
+             oa.technician_id AS "technicianId",
+             COALESCE(NULLIF(TRIM(tu.full_name), ''), NULLIF(TRIM(CONCAT_WS(' ', tu.first_name, tu.last_name)), '')) AS "technicianName"
+           FROM orders
+           LEFT JOIN services ON services.service_id = orders.service_id
+           LEFT JOIN order_assignment oa ON oa.order_id = orders.order_id AND oa.status IN ('ACCEPTED', 'IN_PROGRESS', 'COMPLETED')
+           LEFT JOIN technicians t ON t.technician_id = oa.technician_id
+           LEFT JOIN users tu ON tu.user_id = t.user_id
+           WHERE orders.order_code = $1 OR orders.order_id::text = $1 OR ('AD' || LPAD(orders.order_id::text, 8, '0')) = $1
+           LIMIT 1`,
+          [orderCode || orderId]
+        );
+        if (orderLookup.rows.length > 0) {
+          const row = orderLookup.rows[0];
+          resolvedServiceId = row.serviceId;
+          resolvedServiceName = resolvedServiceName || row.serviceName;
+          resolvedTechnicianId = resolvedTechnicianId || row.technicianId;
+          resolvedTechnicianName = resolvedTechnicianName || row.technicianName;
+        }
+      } catch (lookupErr) {
+        console.warn("Could not auto-resolve service from order:", lookupErr);
+      }
+    }
+
+    if (!resolvedServiceId && resolvedServiceName) {
+      try {
+        const { query: dbQuery } = await import("../configs/db.mjs");
+        const sRes = await dbQuery(`SELECT service_id FROM services WHERE service_name = $1 LIMIT 1`, [resolvedServiceName]);
+        if (sRes.rows.length > 0) {
+          resolvedServiceId = sRes.rows[0].service_id;
+        }
+      } catch (sErr) {
+        console.warn("Could not lookup service by name:", sErr);
+      }
+    }
+
     const newReview = await insertReview({
       orderCode: orderCode || orderId,
       orderId: orderId || null,
       userId,
       userEmail,
       userName,
-      serviceId: serviceId || null,
-      serviceName: serviceName || null,
-      technicianId: technicianId || null,
-      technicianName: technicianName || null,
+      serviceId: resolvedServiceId,
+      serviceName: resolvedServiceName,
+      technicianId: resolvedTechnicianId,
+      technicianName: resolvedTechnicianName,
       rating: numericRating,
       comment: typeof comment === "string" ? comment.trim() : "",
     });

@@ -44,6 +44,7 @@ app.use("/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/auth/user", userAuthRouter);
 app.use("/api/auth/technician", technicianAuthRouter);
+app.use("/auth", authRouter); // Fallback alias
 
 // ============================================
 // 3. PUBLIC API ROUTES (No auth required)
