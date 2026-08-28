@@ -55,27 +55,12 @@ export function createChatSocketServer(httpServer, allowedOrigins) {
       const rooms = await findChatRooms(user);
       await socket.join(rooms.map((room) => `chat:${room.roomId}`));
 
-      if (role === "USER") {
-        const supportRooms = rooms.filter((room) => room.roomType === "SUPPORT");
-        await io.in("role:admin").socketsJoin(
-          supportRooms.map((room) => `chat:${room.roomId}`),
-        );
-      }
-
       return rooms;
     }
 
-    try {
-      const rooms = await loadRooms();
-      if (role === "USER") io.to("role:admin").emit("chat:rooms-updated");
-      for (const room of rooms.filter((item) => item.roomType === "ORDER")) {
-        io.to(`user:${room.customerId}`).emit("chat:rooms-updated");
-      }
-    } catch (error) {
-      console.error("Unable to initialize chat socket", error);
-    }
-
-    socket.on("chat:rooms", async (ack) => {
+    socket.on("chat:rooms", async (payload, callback) => {
+      // รองรับ client เก่าที่ส่ง acknowledgement เป็น argument ตัวแรกด้วย
+      const ack = typeof payload === "function" ? payload : callback;
       try {
         acknowledge(ack, { ok: true, data: await loadRooms() });
       } catch (error) {
@@ -128,6 +113,16 @@ export function createChatSocketServer(httpServer, allowedOrigins) {
         acknowledge(ack, socketError("CHAT_SEND_FAILED", "ส่งข้อความไม่สำเร็จ"));
       }
     });
+
+    try {
+      const rooms = await loadRooms();
+      if (role === "USER") io.to("role:admin").emit("chat:rooms-updated");
+      for (const room of rooms.filter((item) => item.roomType === "ORDER")) {
+        io.to(`user:${room.customerId}`).emit("chat:rooms-updated");
+      }
+    } catch (error) {
+      console.error("Unable to initialize chat socket", error);
+    }
   });
 
   return io;
