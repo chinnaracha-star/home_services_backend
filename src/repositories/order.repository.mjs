@@ -41,12 +41,13 @@ export async function checkout(checkoutData) {
         try {
             const result = await client.query(
                 `INSERT INTO orders
-                    (user_id, service_id, status, total_price, scheduled_date, scheduled_time, address, province, district, subdistrict, additional_info, promotion_id, discount)
-                 VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    (user_id, service_id, status, total_price, scheduled_date, scheduled_time, address, province, district, subdistrict, additional_info, promotion_id, discount, service_latitude, service_longitude, scheduled_at)
+                 VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                  RETURNING *`,
                 [checkoutData.userId, checkoutData.serviceId, checkoutData.totalAmount, checkoutData.serviceDate,
                     checkoutData.serviceTime, checkoutData.address, checkoutData.province, checkoutData.district,
-                    checkoutData.subdistrict, checkoutData.information, promotion?.promotion_id || null, checkoutData.discount],
+                    checkoutData.subdistrict, checkoutData.information, promotion?.promotion_id || null, checkoutData.discount,
+                    checkoutData.latitude, checkoutData.longitude, checkoutData.scheduledAt],
             );
             order = result.rows[0];
         } catch (error) {
