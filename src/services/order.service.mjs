@@ -37,6 +37,23 @@ function requireText(value, field) {
     return value.trim();
 }
 
+function requireCoordinate(value, field, min, max) {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < min || number > max) {
+        throw new CheckoutError("validation", `${field} is required and must be a valid coordinate`, {
+            statusCode: 400,
+            code: "INVALID_CHECKOUT_DATA",
+        });
+    }
+    return number;
+}
+
+function toScheduledAt(serviceDate, serviceTime) {
+    const scheduled = new Date(`${serviceDate}T${serviceTime}:00`);
+    if (Number.isNaN(scheduled.getTime())) return null;
+    return scheduled.toISOString();
+}
+
 /**
  * Persists a completed (or pending PromptPay) checkout atomically.  A failure
  * rolls back the order, all order items, payment record, and promotion quota.
@@ -54,6 +71,8 @@ export async function checkoutService(checkoutData) {
     const province = requireText(checkoutData.province, "province");
     const district = requireText(checkoutData.district, "district");
     const subdistrict = requireText(checkoutData.subdistrict, "subdistrict");
+    const latitude = requireCoordinate(checkoutData.latitude, "latitude", -90, 90);
+    const longitude = requireCoordinate(checkoutData.longitude, "longitude", -180, 180);
     const items = checkoutData.items;
 
     if (!Number.isFinite(totalAmount) || totalAmount <= 0 || !Number.isFinite(discount) || discount < 0) {
@@ -96,6 +115,9 @@ export async function checkoutService(checkoutData) {
         province,
         district,
         subdistrict,
+        latitude,
+        longitude,
+        scheduledAt: toScheduledAt(serviceDate, serviceTime),
         information: typeof checkoutData.information === "string" ? checkoutData.information.trim() || null : null,
         promotionCode: typeof checkoutData.promotionCode === "string" ? checkoutData.promotionCode.trim() || null : null,
         items: normalizedItems,

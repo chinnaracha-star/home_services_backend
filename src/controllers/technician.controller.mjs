@@ -20,12 +20,16 @@ import {
 } from "../repositories/technician-orders.repository.mjs";
 
 function toWorkspaceProfile(settings) {
+  const firstName = settings.firstName || "";
+  const lastName = settings.lastName || "";
+
   return {
     technicianId: String(settings.technicianId),
     userId: String(settings.userId),
     email: settings.email || "",
-    fullName:
-      settings.fullName || `${settings.firstName} ${settings.lastName}`.trim(),
+    firstName,
+    lastName,
+    fullName: settings.fullName || `${firstName} ${lastName}`.trim(),
     phone: settings.phone || null,
     address: settings.address || null,
     isAvailable: Boolean(settings.isAvailable),
@@ -46,16 +50,31 @@ async function getOwnedTechnicianSettings(userId) {
   return settings;
 }
 
+function pickProvidedText(body, camelKey, snakeKey) {
+  if (body?.[camelKey] !== undefined) return String(body[camelKey] ?? "");
+  if (body?.[snakeKey] !== undefined) return String(body[snakeKey] ?? "");
+  return undefined;
+}
+
 function settingsFromWorkspaceBody(body, current) {
-  const fullName =
-    body?.fullName !== undefined
-      ? String(body.fullName).trim()
-      : `${current.firstName} ${current.lastName}`.trim();
-  const parts = fullName.split(/\s+/).filter(Boolean);
+  const firstFromBody = pickProvidedText(body, "firstName", "first_name");
+  const lastFromBody = pickProvidedText(body, "lastName", "last_name");
+
+  let firstName = current.firstName;
+  let lastName = current.lastName;
+
+  if (firstFromBody !== undefined || lastFromBody !== undefined) {
+    firstName = firstFromBody !== undefined ? firstFromBody.trim() : current.firstName;
+    lastName = lastFromBody !== undefined ? lastFromBody.trim() : current.lastName;
+  } else if (body?.fullName !== undefined) {
+    const parts = String(body.fullName).trim().split(/\s+/).filter(Boolean);
+    firstName = parts[0] || "";
+    lastName = parts.slice(1).join(" ");
+  }
 
   return {
-    firstName: parts[0] || current.firstName,
-    lastName: parts.slice(1).join(" ") || current.lastName || "-",
+    firstName,
+    lastName,
     phone: body?.phone !== undefined ? body.phone : current.phone,
     address: body?.address !== undefined ? body.address || "" : current.address,
     isAvailable:
