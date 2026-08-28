@@ -1,4 +1,5 @@
 import { checkout, postOrderRepository, postOrderItemRepository } from "../repositories/order.repository.mjs";
+import { toScheduledAt } from "../utils/schedule.mjs";
 
 class CheckoutError extends Error {
     constructor(stage, message, { statusCode = 500, code = "CHECKOUT_FAILED" } = {}) {
@@ -40,12 +41,6 @@ function requireCoordinate(value, field, min, max) {
         });
     }
     return number;
-}
-
-function toScheduledAt(serviceDate, serviceTime) {
-    const scheduled = new Date(`${serviceDate}T${serviceTime}:00`);
-    if (Number.isNaN(scheduled.getTime())) return null;
-    return scheduled.toISOString();
 }
 
 /**
