@@ -1,4 +1,10 @@
-import { checkoutService, postOrderService, postOrderItemService } from "../services/order.service.mjs";
+import { 
+    checkoutService, 
+    postOrderService, 
+    postOrderItemService,
+    getUserOrdersService,
+    getOrderByIdService,
+} from "../services/order.service.mjs";
 
 function hasValue(value) {
     return value !== undefined && value !== null && value !== "";
@@ -114,6 +120,58 @@ export async function postOrderItemController(req, res) {
             message: "Server could not create order item",
             code: "ORDER_ITEM_CREATION_FAILED",
             error: error.message
+        });
+    }
+}
+
+export async function getUserOrdersController(req, res) {
+    try {
+        const userId = req.user?.id || req.headers["x-user-id"];
+        if (!userId) {
+            return res.status(401).json({
+                message: "Unauthorized",
+                code: "UNAUTHORIZED",
+            });
+        }
+
+        const orders = await getUserOrdersService(userId);
+        return res.status(200).json({
+            success: true,
+            data: orders,
+        });
+    } catch (error) {
+        console.error("Error fetching user orders:", error);
+        return res.status(500).json({
+            message: "Server could not fetch user orders",
+            code: "ORDER_FETCH_FAILED",
+            error: error.message,
+        });
+    }
+}
+
+export async function getOrderByIdController(req, res) {
+    try {
+        const userId = req.user?.id || req.headers["x-user-id"];
+        const orderIdOrCode = req.params.id;
+
+        const order = await getOrderByIdService(orderIdOrCode, userId);
+        if (!order) {
+            return res.status(404).json({
+                message: "Order not found",
+                code: "NOT_FOUND",
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: order,
+        });
+    } catch (error) {
+        console.error("Error fetching order by ID:", error);
+        return res.status(500).json({
+            message: "Server could not fetch order",
+            code: "ORDER_FETCH_FAILED",
+            error: error.message,
         });
     }
 }

@@ -1,4 +1,10 @@
-import { checkout, postOrderRepository, postOrderItemRepository } from "../repositories/order.repository.mjs";
+import { 
+    checkout, 
+    postOrderRepository, 
+    postOrderItemRepository,
+    getUserOrdersRepository,
+    getOrderByIdRepository,
+} from "../repositories/order.repository.mjs";
 import { toScheduledAt } from "../utils/schedule.mjs";
 
 class CheckoutError extends Error {
@@ -135,4 +141,12 @@ export async function postOrderItemService(orderItemData) {
     }
 
     return result;
+}
+
+export async function getUserOrdersService(userId) {
+    return getUserOrdersRepository(userId);
+}
+
+export async function getOrderByIdService(orderIdOrCode, userId) {
+    return getOrderByIdRepository(orderIdOrCode, userId);
 }

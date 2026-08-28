@@ -13,6 +13,7 @@ import authRouter from "./routes/auth.route.mjs";
 import { userAuthRouter } from "./routes/user-auth.route.mjs";
 import { technicianAuthRouter } from "./routes/technician-auth.route.mjs";
 import { technicianRouter } from "./routes/technician.route.mjs";
+import { reviewRouter } from "./routes/review.route.mjs";
 
 import dotenv from "dotenv";
 
@@ -22,6 +23,7 @@ import promotionRouter from "./routes/promotion.routes.mjs";
 import orderRouter from "./routes/order.route.mjs";
 
 export const app = express();
+
 
 app.use(
   cors({
@@ -42,6 +44,7 @@ app.use("/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/auth/user", userAuthRouter);
 app.use("/api/auth/technician", technicianAuthRouter);
+app.use("/auth", authRouter); // Fallback alias
 
 // ============================================
 // 3. PUBLIC API ROUTES (No auth required)
@@ -69,6 +72,8 @@ app.use("/api/technicians", technicianRouter);
 app.use("/api/admin/categories", adminCategoryRouter);
 app.use("/api/admin/services", adminServiceRouter);
 app.use("/api/admin/promotions", adminPromotionRouter);
+app.use("/api/reviews", reviewRouter);
+
 
 app.use((error, _req, res, _next) => {
   if (error?.code === "LIMIT_FILE_SIZE") {
