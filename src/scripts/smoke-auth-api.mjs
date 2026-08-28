@@ -45,6 +45,17 @@ try {
   const unauthAdmin = await get("/api/admin/categories");
   assert.equal(unauthAdmin.response.status, 401);
 
+  const unauthPasswordChange = await fetch(`${baseUrl}/api/users/me/password`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      currentPassword: "userPassword123!",
+      newPassword: "newPassword123!",
+      confirmNewPassword: "newPassword123!",
+    }),
+  });
+  assert.equal(unauthPasswordChange.status, 401);
+
   // 4. User register validation (does not change old /auth/register)
   const invalidUserRegister = await post("/auth/user/register", {
     fullName: "สมชาย",

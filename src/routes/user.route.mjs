@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { protect } from "../middlewares/protect.middleware.mjs";
 import {
+  changeMyPassword,
   getMyProfile,
   uploadMyAvatar,
   updateMyProfile,
@@ -37,6 +38,7 @@ const upload = multer({
 
 userRouter.get("/me", protect, getMyProfile);
 userRouter.patch("/me", protect, updateMyProfile);
+userRouter.patch("/me/password", protect, changeMyPassword);
 userRouter.post(
   "/me/avatar",
   protect,

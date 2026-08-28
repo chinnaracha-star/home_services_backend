@@ -8,16 +8,24 @@ import {
 } from "../repositories/user.repository.mjs";
 import { uploadAvatar } from "../services/avatar.service.mjs";
 import { HttpError } from "../utils/http-error.mjs";
-import { validateUpdateProfile } from "../validators/user.validator.mjs";
+import {
+  validateChangePassword,
+  validateUpdateProfile,
+} from "../validators/user.validator.mjs";
+import { createRequestAuthClient } from "../configs/supabase.mjs";
+
+function createUserAuthClient(accessToken) {
+  return createClient(env.supabaseUrl, env.supabaseAnonKey, {
+    global: {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  });
+}
 
 async function syncAuthEmail(req, nextEmail) {
   if (!req.accessToken || !nextEmail) return;
 
-  const userClient = createClient(env.supabaseUrl, env.supabaseAnonKey, {
-    global: {
-      headers: { Authorization: `Bearer ${req.accessToken}` },
-    },
-  });
+  const userClient = createUserAuthClient(req.accessToken);
   const { error } = await userClient.auth.updateUser({ email: nextEmail });
 
   if (error) {
@@ -96,6 +104,83 @@ export async function updateMyProfile(req, res, next) {
     res.status(200).json({
       data: user,
       message: "อัปเดตโปรไฟล์สำเร็จ",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function changeMyPassword(req, res, next) {
+  try {
+    const { errors, value } = validateChangePassword(req.body);
+
+    if (errors.length > 0) {
+      res.status(400).json({
+        message: "ข้อมูลรหัสผ่านไม่ถูกต้อง",
+        code: "VALIDATION_ERROR",
+        errors,
+      });
+      return;
+    }
+
+    if (!req.accessToken || !req.authUserId) {
+      throw new HttpError(
+        401,
+        "AUTH_TOKEN_REQUIRED",
+        "กรุณาเข้าสู่ระบบก่อนเปลี่ยนรหัสผ่าน",
+      );
+    }
+
+    const authClient = createRequestAuthClient();
+    const {
+      data: { user: tokenUser },
+      error: tokenError,
+    } = await authClient.auth.getUser(req.accessToken);
+
+    if (tokenError || !tokenUser?.email || tokenUser.id !== req.authUserId) {
+      throw new HttpError(
+        401,
+        "AUTH_TOKEN_REQUIRED",
+        "กรุณาเข้าสู่ระบบก่อนเปลี่ยนรหัสผ่าน",
+      );
+    }
+
+    const { data: signInData, error: currentPasswordError } =
+      await authClient.auth.signInWithPassword({
+        email: tokenUser.email,
+        password: value.currentPassword,
+      });
+
+    if (
+      currentPasswordError ||
+      !signInData?.session ||
+      signInData.user?.id !== tokenUser.id
+    ) {
+      throw new HttpError(
+        400,
+        "CURRENT_PASSWORD_INVALID",
+        "รหัสผ่านปัจจุบันไม่ถูกต้อง",
+        [{ field: "currentPassword", message: "รหัสผ่านปัจจุบันไม่ถูกต้อง" }],
+      );
+    }
+
+    const { error: updateError } = await authClient.auth.updateUser({
+      password: value.newPassword,
+    });
+
+    await authClient.auth.signOut({ scope: "local" }).catch(() => undefined);
+
+    if (updateError) {
+      throw new HttpError(
+        400,
+        "PASSWORD_UPDATE_FAILED",
+        updateError.message || "ไม่สามารถเปลี่ยนรหัสผ่านได้",
+      );
+    }
+
+    res.status(200).json({
+      data: null,
+      message: "เปลี่ยนรหัสผ่านสำเร็จ",
     });
   } catch (error) {
     next(error);
