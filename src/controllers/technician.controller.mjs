@@ -20,11 +20,16 @@ import {
 } from "../repositories/technician-orders.repository.mjs";
 
 function toWorkspaceProfile(settings) {
+  const firstName = settings.firstName || "";
+  const lastName = settings.lastName || "";
+
   return {
     technicianId: String(settings.technicianId),
     userId: String(settings.userId),
     email: settings.email || "",
-    fullName: settings.fullName || `${settings.firstName} ${settings.lastName}`.trim(),
+    firstName,
+    lastName,
+    fullName: settings.fullName || `${firstName} ${lastName}`.trim(),
     phone: settings.phone || null,
     address: settings.address || null,
     isAvailable: Boolean(settings.isAvailable),
@@ -45,20 +50,37 @@ async function getOwnedTechnicianSettings(userId) {
   return settings;
 }
 
+function pickProvidedText(body, camelKey, snakeKey) {
+  if (body?.[camelKey] !== undefined) return String(body[camelKey] ?? "");
+  if (body?.[snakeKey] !== undefined) return String(body[snakeKey] ?? "");
+  return undefined;
+}
+
 function settingsFromWorkspaceBody(body, current) {
-  const fullName =
-    body?.fullName !== undefined
-      ? String(body.fullName).trim()
-      : `${current.firstName} ${current.lastName}`.trim();
-  const parts = fullName.split(/\s+/).filter(Boolean);
+  const firstFromBody = pickProvidedText(body, "firstName", "first_name");
+  const lastFromBody = pickProvidedText(body, "lastName", "last_name");
+
+  let firstName = current.firstName;
+  let lastName = current.lastName;
+
+  if (firstFromBody !== undefined || lastFromBody !== undefined) {
+    firstName = firstFromBody !== undefined ? firstFromBody.trim() : current.firstName;
+    lastName = lastFromBody !== undefined ? lastFromBody.trim() : current.lastName;
+  } else if (body?.fullName !== undefined) {
+    const parts = String(body.fullName).trim().split(/\s+/).filter(Boolean);
+    firstName = parts[0] || "";
+    lastName = parts.slice(1).join(" ");
+  }
 
   return {
-    firstName: parts[0] || current.firstName,
-    lastName: parts.slice(1).join(" ") || current.lastName || "-",
+    firstName,
+    lastName,
     phone: body?.phone !== undefined ? body.phone : current.phone,
     address: body?.address !== undefined ? body.address || "" : current.address,
-    isAvailable: body?.isAvailable !== undefined ? body.isAvailable : current.isAvailable,
-    serviceIds: body?.serviceIds !== undefined ? body.serviceIds : current.serviceIds,
+    isAvailable:
+      body?.isAvailable !== undefined ? body.isAvailable : current.isAvailable,
+    serviceIds:
+      body?.serviceIds !== undefined ? body.serviceIds : current.serviceIds,
   };
 }
 
@@ -164,7 +186,11 @@ export async function patchMyTechnicianLocation(req, res, next) {
     await getOwnedTechnicianSettings(req.user.id);
     const result = await updateTechnicianLocation(req.user.id, value);
     if (!result) {
-      throw new HttpError(404, "TECHNICIAN_PROFILE_NOT_FOUND", "ไม่พบข้อมูลช่าง");
+      throw new HttpError(
+        404,
+        "TECHNICIAN_PROFILE_NOT_FOUND",
+        "ไม่พบข้อมูลช่าง",
+      );
     }
 
     res.status(200).json({
@@ -187,7 +213,12 @@ export async function getMyServiceRequests(req, res, next) {
   try {
     const { errors, value } = parseTechnicianListQuery(req.query);
     if (errors.length > 0) {
-      throw new HttpError(400, "VALIDATION_ERROR", "ข้อมูลค้นหาไม่ถูกต้อง", errors);
+      throw new HttpError(
+        400,
+        "VALIDATION_ERROR",
+        "ข้อมูลค้นหาไม่ถูกต้อง",
+        errors,
+      );
     }
 
     const settings = await getOwnedTechnicianSettings(req.user.id);
@@ -230,7 +261,11 @@ export async function postAcceptServiceRequest(req, res, next) {
 
     const settings = await getOwnedTechnicianSettings(req.user.id);
     if (!settings.isAvailable) {
-      throw new HttpError(403, "TECHNICIAN_UNAVAILABLE", "กรุณาเปิดสถานะพร้อมรับบริการก่อนรับงาน");
+      throw new HttpError(
+        403,
+        "TECHNICIAN_UNAVAILABLE",
+        "กรุณาเปิดสถานะพร้อมรับบริการก่อนรับงาน",
+      );
     }
 
     const result = await acceptOrderForTechnician({
@@ -280,7 +315,12 @@ export async function getMyTechnicianJobs(req, res, next) {
   try {
     const { errors, value } = parseTechnicianListQuery(req.query);
     if (errors.length > 0) {
-      throw new HttpError(400, "VALIDATION_ERROR", "ข้อมูลค้นหาไม่ถูกต้อง", errors);
+      throw new HttpError(
+        400,
+        "VALIDATION_ERROR",
+        "ข้อมูลค้นหาไม่ถูกต้อง",
+        errors,
+      );
     }
 
     const settings = await getOwnedTechnicianSettings(req.user.id);

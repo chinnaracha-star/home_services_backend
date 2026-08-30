@@ -10,7 +10,9 @@ const SUMMARY_COLUMNS = `
   COALESCE(MAX(option.price), 0)::float8 AS "maxPrice",
   service.is_featured AS "isFeatured",
   service.display_order AS "displayOrder",
-  service.popularity_score AS "popularityScore"
+  service.popularity_score AS "popularityScore",
+  COALESCE(r.avg_rating, 0)::float8 AS "averageRating",
+  COALESCE(r.count_reviews, 0)::int AS "reviewCount"
 `;
 
 const SUMMARY_GROUP = `
@@ -21,7 +23,9 @@ const SUMMARY_GROUP = `
   service.image_url,
   service.is_featured,
   service.display_order,
-  service.popularity_score
+  service.popularity_score,
+  r.avg_rating,
+  r.count_reviews
 `;
 
 export async function findServices({ featured, limit }) {
@@ -31,6 +35,13 @@ export async function findServices({ featured, limit }) {
       FROM services service
       JOIN categories category ON category.category_id = service.category_id
       LEFT JOIN service_options option ON option.service_id = service.service_id
+      LEFT JOIN LATERAL (
+        SELECT 
+          COALESCE(ROUND(AVG(rating)::numeric, 1)::float8, 0) AS avg_rating,
+          COUNT(*)::int AS count_reviews
+        FROM reviews
+        WHERE reviews.service_id = service.service_id
+      ) r ON true
       WHERE service.is_active = true
         AND category.is_active = true
         AND ($1::boolean = false OR service.is_featured = true)
@@ -50,6 +61,13 @@ export async function findServiceById(serviceId) {
       FROM services service
       JOIN categories category ON category.category_id = service.category_id
       LEFT JOIN service_options option ON option.service_id = service.service_id
+      LEFT JOIN LATERAL (
+        SELECT 
+          COALESCE(ROUND(AVG(rating)::numeric, 1)::float8, 0) AS avg_rating,
+          COUNT(*)::int AS count_reviews
+        FROM reviews
+        WHERE reviews.service_id = service.service_id
+      ) r ON true
       WHERE service.service_id = $1 AND service.is_active = true AND category.is_active = true
       GROUP BY ${SUMMARY_GROUP}
       LIMIT 1
@@ -72,3 +90,22 @@ export async function findServiceOptions(serviceId) {
   );
   return result.rows;
 }
+
+
+// for service option
+
+export async function getServiceOptionRepository(serviceId) {
+  const result = await query(
+    `
+    SELECT s.service_id, s.service_name, so.option_id, so.option_name, so.price, so.unit
+    FROM services AS s
+    INNER JOIN service_options AS so
+    ON s.service_id = so.service_id
+    WHERE s.service_id=$1
+    ;
+    `,
+    [serviceId],
+  );
+  return result.rows ?? null;
+}
+

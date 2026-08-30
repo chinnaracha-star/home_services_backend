@@ -103,3 +103,37 @@ const promotionRepository = {
 };
 
 export default promotionRepository;
+
+
+// for service-details page
+
+
+export async function getPromotionRepository(promotionCode) {
+    
+    const queryText = `
+      SELECT promotion_id, promotion_code, quota, quota_used, type, discount
+      FROM promotions 
+      WHERE UPPER(promotion_code) = UPPER($1) AND status = 'active' 
+      LIMIT 1
+    `;
+    
+    const result = await pool.query(queryText, [promotionCode]);
+    
+    return result.rows[0];
+    
+}
+
+export async function updatePromotionQuotaRepository(id, newQuota) {
+    
+    const queryText = 
+    `
+      UPDATE promotions
+      SET quota_used = $1, update_at = NOW()
+      WHERE promotion_id = $2
+      RETURNING promotion_id, promotion_code, quota, quota_used
+    `;
+
+    const result = await pool.query(queryText, [newQuota, id]);
+
+    return result.rows[0];
+}
