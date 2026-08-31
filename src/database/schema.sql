@@ -444,6 +444,83 @@ CREATE UNIQUE INDEX IF NOT EXISTS order_assignment_one_active_uidx
   ON order_assignment (order_id)
   WHERE status IN ('ACCEPTED', 'IN_PROGRESS');
 
+CREATE TABLE IF NOT EXISTS order_assignment_completion_images (
+  image_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  assignment_id BIGINT NOT NULL
+    REFERENCES order_assignment(assignment_id) ON DELETE CASCADE,
+  object_path TEXT NOT NULL UNIQUE,
+  sort_order SMALLINT NOT NULL CHECK (sort_order BETWEEN 1 AND 5),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (assignment_id, sort_order)
+);
+
+CREATE INDEX IF NOT EXISTS order_assignment_completion_images_assignment_idx
+  ON order_assignment_completion_images (assignment_id);
+
+INSERT INTO storage.buckets (
+  id,
+  name,
+  public,
+  file_size_limit,
+  allowed_mime_types
+)
+VALUES (
+  'job-completion-images',
+  'job-completion-images',
+  false,
+  5242880,
+  ARRAY['image/jpeg', 'image/png', 'image/webp']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'Users can read own job completion images'
+  ) THEN
+    CREATE POLICY "Users can read own job completion images"
+      ON storage.objects FOR SELECT TO authenticated
+      USING (
+        bucket_id = 'job-completion-images'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+      );
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'Users can upload own job completion images'
+  ) THEN
+    CREATE POLICY "Users can upload own job completion images"
+      ON storage.objects FOR INSERT TO authenticated
+      WITH CHECK (
+        bucket_id = 'job-completion-images'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+      );
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'Users can delete own job completion images'
+  ) THEN
+    CREATE POLICY "Users can delete own job completion images"
+      ON storage.objects FOR DELETE TO authenticated
+      USING (
+        bucket_id = 'job-completion-images'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+      );
+  END IF;
+END $$;
+
 INSERT INTO storage.buckets (
   id,
   name,
