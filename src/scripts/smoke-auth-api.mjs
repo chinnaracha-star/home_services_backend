@@ -108,6 +108,24 @@ try {
   assert.ok(technicianLogin.body.data.technician.technicianId);
   assert.ok(technicianLogin.body.data.session.accessToken);
 
+  const invalidForgotPassword = await post("/auth/forgot-password", {
+    email: "not-an-email",
+  });
+  assert.equal(invalidForgotPassword.response.status, 400);
+  assert.equal(invalidForgotPassword.body.code, "VALIDATION_ERROR");
+
+  const unauthResetPassword = await post("/auth/reset-password", {
+    newPassword: "newPassword123!",
+    confirmNewPassword: "newPassword123!",
+  });
+  assert.equal(unauthResetPassword.response.status, 401);
+
+  const shortResetPassword = await post("/auth/reset-password", {
+    newPassword: "short",
+    confirmNewPassword: "short",
+  });
+  assert.equal(shortResetPassword.response.status, 400);
+
   console.log("Auth API basic tests passed!");
 } finally {
   server.close();
