@@ -12,12 +12,26 @@ import {
   updateTechnicianSettings,
 } from "../repositories/technician.repository.mjs";
 import {
+  addCompletionImages,
   acceptOrderForTechnician,
+  completeJobForTechnician,
   declineOrderForTechnician,
   findAvailableRequests,
+  findCompletionImagePaths,
+  findCompletionUploadTarget,
   findTechnicianJob,
   findTechnicianJobs,
 } from "../repositories/technician-orders.repository.mjs";
+import {
+  createCompletionImageSignedUrls,
+  removeCompletionImages,
+  uploadCompletionImages,
+} from "../services/job-completion-image.service.mjs";
+import {
+  MAX_COMPLETION_IMAGES,
+  MIN_COMPLETION_IMAGES,
+  requireCompletionImageCount,
+} from "../middlewares/job-completion-upload.middleware.mjs";
 
 function toWorkspaceProfile(settings) {
   const firstName = settings.firstName || "";
@@ -209,6 +223,70 @@ function assignmentError(code) {
   return new HttpError(404, "ORDER_NOT_FOUND", "ไม่พบคำขอบริการ");
 }
 
+function completionError(code, imageCount = 0) {
+  if (code === "JOB_ALREADY_COMPLETED") {
+    return new HttpError(409, code, "งานนี้ถูกดำเนินการเสร็จสิ้นแล้ว");
+  }
+  if (code === "INVALID_JOB_STATUS") {
+    return new HttpError(
+      409,
+      code,
+      "สถานะปัจจุบันของงานไม่อนุญาตให้ส่งมอบงาน",
+    );
+  }
+  if (code === "TOO_MANY_COMPLETION_IMAGES") {
+    return new HttpError(
+      400,
+      code,
+      `อัปโหลดรูปหลักฐานได้ไม่เกิน ${MAX_COMPLETION_IMAGES} รูป`,
+    );
+  }
+  if (code === "MINIMUM_COMPLETION_IMAGES_REQUIRED") {
+    return new HttpError(
+      400,
+      code,
+      `ต้องมีรูปหลักฐานอย่างน้อย ${MIN_COMPLETION_IMAGES} รูป (ปัจจุบัน ${imageCount} รูป)`,
+      [{ field: "images", imageCount, minimum: MIN_COMPLETION_IMAGES }],
+    );
+  }
+  return new HttpError(404, "JOB_NOT_FOUND", "ไม่พบงานที่ต้องการ");
+}
+
+async function tryCreateCompletionImageSignedUrls(accessToken, objectPaths) {
+  try {
+    return await createCompletionImageSignedUrls({
+      accessToken,
+      objectPaths,
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function attachCompletionImages(job, technicianId, accessToken) {
+  if (!job) return job;
+  const images = await findCompletionImagePaths({
+    technicianId,
+    assignmentId: job.assignmentId,
+  });
+  const signed = await tryCreateCompletionImageSignedUrls(
+    accessToken,
+    images.map((image) => image.objectPath),
+  );
+  const signedByPath = new Map(
+    signed.map((image) => [image.objectPath, image]),
+  );
+
+  return {
+    ...job,
+    completionImages: images.map((image) => ({
+      ...image,
+      signedUrl: signedByPath.get(image.objectPath)?.signedUrl ?? null,
+      expiresIn: signedByPath.get(image.objectPath)?.expiresIn ?? null,
+    })),
+  };
+}
+
 export async function getMyServiceRequests(req, res, next) {
   try {
     const { errors, value } = parseTechnicianListQuery(req.query);
@@ -350,16 +428,139 @@ export async function getMyTechnicianJob(req, res, next) {
     }
 
     const settings = await getOwnedTechnicianSettings(req.user.id);
-    const job = await findTechnicianJob({
+    let job = await findTechnicianJob({
       technicianId: settings.technicianId,
       assignmentId,
     });
     if (!job) {
       throw new HttpError(404, "JOB_NOT_FOUND", "ไม่พบงานที่ต้องการ");
     }
+    job = await attachCompletionImages(
+      job,
+      settings.technicianId,
+      req.accessToken,
+    );
 
     res.status(200).json({
       message: "Success",
+      data: job,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function postMyJobCompletionImages(req, res, next) {
+  let uploadedPaths = [];
+  try {
+    const assignmentId = parsePositiveId(req.params.assignmentId);
+    if (!assignmentId) {
+      throw new HttpError(404, "JOB_NOT_FOUND", "ไม่พบงานที่ต้องการ");
+    }
+    requireCompletionImageCount(req.files);
+
+    const settings = await getOwnedTechnicianSettings(req.user.id);
+    const target = await findCompletionUploadTarget({
+      technicianId: settings.technicianId,
+      assignmentId,
+    });
+    if (!target) throw completionError("JOB_NOT_FOUND");
+
+    const status = String(target.status).toUpperCase();
+    if (status === "COMPLETED") {
+      throw completionError("JOB_ALREADY_COMPLETED");
+    }
+    if (!["ACCEPTED", "IN_PROGRESS"].includes(status)) {
+      throw completionError("INVALID_JOB_STATUS");
+    }
+    if (target.imageCount + req.files.length > MAX_COMPLETION_IMAGES) {
+      throw completionError("TOO_MANY_COMPLETION_IMAGES");
+    }
+
+    uploadedPaths = await uploadCompletionImages({
+      authUserId: req.authUserId,
+      accessToken: req.accessToken,
+      assignmentId,
+      files: req.files,
+    });
+
+    const result = await addCompletionImages({
+      technicianId: settings.technicianId,
+      assignmentId,
+      objectPaths: uploadedPaths,
+      maxImages: MAX_COMPLETION_IMAGES,
+    });
+    if (result.error) {
+      await removeCompletionImages({
+        accessToken: req.accessToken,
+        objectPaths: uploadedPaths,
+      });
+      uploadedPaths = [];
+      throw completionError(result.error);
+    }
+
+    const persistedPaths = uploadedPaths;
+    uploadedPaths = [];
+    const signed = await tryCreateCompletionImageSignedUrls(
+      req.accessToken,
+      persistedPaths,
+    );
+    const signedByPath = new Map(
+      signed.map((image) => [image.objectPath, image]),
+    );
+
+    res.status(201).json({
+      message: "อัปโหลดรูปหลักฐานสำเร็จ",
+      data: {
+        assignmentId: String(assignmentId),
+        imageCount: result.imageCount,
+        images: result.images.map((image) => ({
+          ...image,
+          signedUrl: signedByPath.get(image.objectPath)?.signedUrl ?? null,
+          expiresIn: signedByPath.get(image.objectPath)?.expiresIn ?? null,
+        })),
+      },
+    });
+  } catch (error) {
+    if (uploadedPaths.length > 0) {
+      await removeCompletionImages({
+        accessToken: req.accessToken,
+        objectPaths: uploadedPaths,
+      });
+    }
+    next(error);
+  }
+}
+
+export async function postCompleteMyTechnicianJob(req, res, next) {
+  try {
+    const assignmentId = parsePositiveId(req.params.assignmentId);
+    if (!assignmentId) {
+      throw new HttpError(404, "JOB_NOT_FOUND", "ไม่พบงานที่ต้องการ");
+    }
+
+    const settings = await getOwnedTechnicianSettings(req.user.id);
+    const result = await completeJobForTechnician({
+      technicianId: settings.technicianId,
+      assignmentId,
+      minimumImages: MIN_COMPLETION_IMAGES,
+    });
+    if (result.error) {
+      throw completionError(result.error, result.imageCount);
+    }
+
+    let job = await findTechnicianJob({
+      technicianId: settings.technicianId,
+      assignmentId,
+    });
+    job = await attachCompletionImages(
+      job,
+      settings.technicianId,
+      req.accessToken,
+    );
+
+    res.status(200).json({
+      message: "ดำเนินการเสร็จสิ้นและส่งมอบงานสำเร็จ",
       data: job,
     });
   } catch (error) {

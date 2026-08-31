@@ -9,9 +9,14 @@ import {
   patchMyTechnicianLocation,
   patchMyTechnicianWorkspaceSettings,
   postAcceptServiceRequest,
+  postCompleteMyTechnicianJob,
   postDeclineServiceRequest,
+  postMyJobCompletionImages,
   updateMyTechnicianSettings,
 } from "../controllers/technician.controller.mjs";
+import {
+  uploadJobCompletionImages,
+} from "../middlewares/job-completion-upload.middleware.mjs";
 
 const technicianRouter = Router();
 
@@ -25,5 +30,14 @@ technicianRouter.post("/me/requests/:orderId/accept", postAcceptServiceRequest);
 technicianRouter.post("/me/requests/:orderId/decline", postDeclineServiceRequest);
 technicianRouter.get("/me/jobs", getMyTechnicianJobs);
 technicianRouter.get("/me/jobs/:assignmentId", getMyTechnicianJob);
+technicianRouter.post(
+  "/me/jobs/:assignmentId/completion-images",
+  uploadJobCompletionImages,
+  postMyJobCompletionImages,
+);
+technicianRouter.post(
+  "/me/jobs/:assignmentId/complete",
+  postCompleteMyTechnicianJob,
+);
 
 export { technicianRouter };
