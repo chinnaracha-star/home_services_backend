@@ -4,6 +4,7 @@ function hasValue(value) {
     return value !== undefined && value !== null && value !== "";
 }
 
+// ใช้อันนี้อันเดียว
 export async function checkoutController(req, res) {
     try {
         const result = await checkoutService(req.body);
@@ -25,6 +26,7 @@ export async function checkoutController(req, res) {
     }
 }
 
+// ไม่ได้ใช้
 export async function postOrderController(req, res) {
     try {
         // Validate required fields
@@ -76,7 +78,7 @@ export async function postOrderController(req, res) {
 }
 
 
-
+// ไม่ได้ใช้
 export async function postOrderItemController(req, res) {
     try {
         // Validate required fields
