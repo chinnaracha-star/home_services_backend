@@ -1,48 +1,39 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, it, vi } from "vitest";
 import { checkoutService } from "../src/services/order.service.mjs";
 
-const validCheckoutPayload = {
-    userId: 1,
-    serviceId: 2,
-    totalAmount: 1000,
-    discount: 50,
-    serviceDate: "2026-08-31",
-    serviceTime: "14:00:00",
-    address: "อาคารเดอะ ธารา เลขที่ 58/28 หมู่ 2 ถนนแจ้งวัฒนะ",
-    province: "นนทบุรี",
-    district: "ปากเกร็ด",
-    subdistrict: "บางตลาด",
-    information: "",
-    promotionCode: "HOME2012",
-    paymentMethod: "card",
-    paymentStatus: "succeeded",
-    items: [{
-        optionId: 3,
-        quantity: 1,
-        unitPrice: 1000,
-    }],
-};
+vi.mock("../src/repositories/order.repository.mjs", () => ({
+  checkout: vi.fn(),
+  postOrderRepository: vi.fn(),
+  postOrderItemRepository: vi.fn(),
+}));
 
-test("totalAmount or discount <= 0", async () => {
-    const requestBody = {
-        ...validCheckoutPayload,
-        totalAmount: 0,
+describe("checkoutService", () => {
+  it("rejects an invalid totalAmount", async () => {
+    const checkoutData = {
+      userId: 1,
+      serviceId: 1,
+      totalAmount: 0,
+      discount: 0,
+      paymentMethod: "promptpay",
+      paymentStatus: "pending",
+      serviceDate: "2026-09-10",
+      serviceTime: "10:00",
+      address: "123 Main Street",
+      province: "Bangkok",
+      district: "Pathum Wan",
+      subdistrict: "Lumphini",
+      items: [{ optionId: 1, quantity: 1, unitPrice: 500 }],
     };
 
-    // checkoutService is async, so it returns a rejected Promise — not a thrown sync error.
-    // assert.rejects waits for that Promise and gives you the error object
-    // (statusCode lives on the error, not on a return value).
-    await assert.rejects(
-        () => checkoutService(requestBody),
-        (error) => {
-            assert.equal(error.message, "totalAmount and discount are invalid");
-            assert.equal(error.statusCode, 400);
-            assert.equal(error.code, "INVALID_CHECKOUT_DATA");
-            assert.equal(error.stage, "validation");
-            return true;
-        },
-    );
+    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+      name: "CheckoutError",
+      stage: "validation",
+      message:
+        "totalAmount must be a positive finite number and discount must be a non-negative finite number",
+      statusCode: 400,
+      code: "INVALID_CHECKOUT_DATA",
+    });
+  });
 });
 
 // ใช้วิธีเดียวกับอันที่ 2
