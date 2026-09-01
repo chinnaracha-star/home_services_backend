@@ -9,6 +9,14 @@ test("parses featured and limit query values", () => {
   assert.deepEqual(parseServiceListQuery({ featured: "true", limit: "3" }), {
     featured: true,
     limit: 3,
+    locale: "th",
+  });
+});
+
+test("parses and validates service locale", () => {
+  assert.equal(parseServiceListQuery({ locale: "EN" }).locale, "en");
+  assert.throws(() => parseServiceListQuery({ locale: "jp" }), {
+    code: "INVALID_LOCALE",
   });
 });
 

@@ -1,4 +1,5 @@
 import { HttpError } from "../utils/http-error.mjs";
+import { parseLocale } from "./locale.validator.mjs";
 
 export function parseServiceListQuery(query = {}) {
   if (
@@ -26,7 +27,11 @@ export function parseServiceListQuery(query = {}) {
     );
   }
 
-  return { featured, limit: rawLimit };
+  return {
+    featured,
+    limit: rawLimit,
+    locale: parseLocale(query.locale),
+  };
 }
 
 export function parseServiceId(value) {

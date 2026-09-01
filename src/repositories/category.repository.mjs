@@ -1,14 +1,22 @@
 import { pool } from "../configs/db.mjs";
 import { query } from "../configs/db.mjs";
 
-export async function findCategories() {
+export async function findCategories(locale = "th") {
   const result = await query(
     `
-      SELECT category_id::text AS id, name
-      FROM categories
-      WHERE is_active = true
-      ORDER BY name ASC, category_id ASC
+      SELECT
+        category.category_id::text AS id,
+        COALESCE(category_translation.name, category.name) AS name
+      FROM categories category
+      LEFT JOIN category_translations category_translation
+        ON category_translation.category_id = category.category_id
+       AND category_translation.locale = $1
+      WHERE category.is_active = true
+      ORDER BY
+        COALESCE(category_translation.name, category.name) ASC,
+        category.category_id ASC
     `,
+    [locale],
   );
   return result.rows;
 }
