@@ -344,7 +344,12 @@ export async function findTechnicianJobs({ technicianId, serviceId, search, sort
   let orderBy = "assignment.assigned_at DESC NULLS LAST";
   if (sort === "newest") orderBy = "assignment.assigned_at DESC NULLS LAST";
   if (sort === "oldest") orderBy = "assignment.assigned_at ASC NULLS LAST";
-  if (sort === "nearest") orderBy = "orders.scheduled_at ASC NULLS LAST";
+  if (sort === "nearest") {
+    orderBy = `
+      CASE WHEN orders.scheduled_at >= NOW() THEN 0 ELSE 1 END ASC,
+      ABS(EXTRACT(EPOCH FROM orders.scheduled_at - NOW())) ASC NULLS LAST
+    `;
+  }
 
   const result = await query(
     `
