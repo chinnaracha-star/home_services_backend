@@ -13,9 +13,7 @@ import authRouter from "./routes/auth.route.mjs";
 import { userAuthRouter } from "./routes/user-auth.route.mjs";
 import { technicianAuthRouter } from "./routes/technician-auth.route.mjs";
 import { technicianRouter } from "./routes/technician.route.mjs";
-
-import dotenv from "dotenv";
-
+import { reviewRouter } from "./routes/review.route.mjs";
 import addressRouter from "./routes/address.routes.mjs";
 import paymentRouter from "./routes/payment.route.mjs";
 import promotionRouter from "./routes/promotion.routes.mjs";
@@ -31,44 +29,33 @@ app.use(
 );
 app.use(express.json());
 
-// ============================================
-// 1. HEALTH CHECK (No prefix)
-// ============================================
 app.use("/health", healthRouter);
 
-// ============================================
-// 2. AUTHENTICATION ROUTES
-// ============================================
-app.use("/api/auth", authRouter);
+app.use("/auth/user", userAuthRouter);
 app.use("/api/auth/user", userAuthRouter);
+app.use("/auth/technician", technicianAuthRouter);
 app.use("/api/auth/technician", technicianAuthRouter);
+app.use("/auth", authRouter);
+app.use("/api/auth", authRouter);
 
-// ============================================
-// 3. PUBLIC API ROUTES (No auth required)
-// ============================================
 app.use("/api/categories", categoryRouter);
 app.use("/api/services", serviceRouter);
-app.use("/api/promotions", promotionRouter);      // Changed from "/" to "/api/promotions"
-app.use("/api", addressRouter);                    // Mount at /api for provinces/districts/subdistricts
-app.use("/api/payments", paymentRouter);           // Changed from "/" to "/api/payments"
-app.use("/api/orders", orderRouter);               // Orders endpoint
+app.use("/api/promotions", promotionRouter);
+app.use("/api", addressRouter);
+app.use("/api/payments", paymentRouter);
+app.use("/api/orders", orderRouter);
+app.use("/api/reviews", reviewRouter);
 
-// ============================================
-// 4. USER ROUTES (Auth required)
-// ============================================
 app.use("/api/users", userRouter);
+app.use("/user", userRouter);
 
-// ============================================
-// 5. TECHNICIAN ROUTES (Auth required)
-// ============================================
+app.use("/api/technician", technicianRouter);
 app.use("/api/technicians", technicianRouter);
 
-// ============================================
-// 6. ADMIN ROUTES (Admin auth required)
-// ============================================
 app.use("/api/admin/categories", adminCategoryRouter);
 app.use("/api/admin/services", adminServiceRouter);
 app.use("/api/admin/promotions", adminPromotionRouter);
+app.use("/api/admin/promotion", adminPromotionRouter);
 
 app.use((error, _req, res, _next) => {
   if (error?.code === "LIMIT_FILE_SIZE") {

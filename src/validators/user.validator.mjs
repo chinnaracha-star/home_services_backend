@@ -1,6 +1,11 @@
 const PHONE_PATTERN = /^0[0-9]{8,9}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_PATTERN = /^[\p{Letter}\p{Mark}]+(?:[ '\-][\p{Letter}\p{Mark}]+)*$/u;
+const MIN_PASSWORD_LENGTH = 12;
+
+function asPassword(value) {
+  return typeof value === "string" ? value : "";
+}
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -103,6 +108,67 @@ export function validateUpdateProfile(body) {
       phone,
       address,
       avatarUrl,
+    },
+  };
+}
+
+export function validateChangePassword(body) {
+  const errors = [];
+  const currentPassword = asPassword(body?.currentPassword);
+  const newPassword = asPassword(body?.newPassword);
+  const confirmNewPassword = asPassword(
+    body?.confirmNewPassword ?? body?.confirmPassword,
+  );
+
+  if (!currentPassword) {
+    errors.push({
+      field: "currentPassword",
+      message: "กรุณากรอกรหัสผ่านปัจจุบัน",
+    });
+  }
+
+  if (!newPassword) {
+    errors.push({
+      field: "newPassword",
+      message: "กรุณากรอกรหัสผ่านใหม่",
+    });
+  } else if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    errors.push({
+      field: "newPassword",
+      message: `รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย ${MIN_PASSWORD_LENGTH} ตัวอักษร`,
+    });
+  }
+
+  if (!confirmNewPassword) {
+    errors.push({
+      field: "confirmNewPassword",
+      message: "กรุณายืนยันรหัสผ่านใหม่",
+    });
+  } else if (newPassword && confirmNewPassword !== newPassword) {
+    errors.push({
+      field: "confirmNewPassword",
+      message: "รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน",
+    });
+  }
+
+  if (
+    currentPassword &&
+    newPassword &&
+    currentPassword === newPassword &&
+    !errors.some((error) => error.field === "newPassword")
+  ) {
+    errors.push({
+      field: "newPassword",
+      message: "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านปัจจุบัน",
+    });
+  }
+
+  return {
+    errors,
+    value: {
+      currentPassword,
+      newPassword,
+      confirmNewPassword,
     },
   };
 }
