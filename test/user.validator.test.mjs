@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateUpdateProfile } from "../src/validators/user.validator.mjs";
+import { validateChangePassword, validateUpdateProfile } from "../src/validators/user.validator.mjs";
 
 const validProfile = {
   fullName: "สมชาย ใจดี",
@@ -52,4 +52,58 @@ test("profile update rejects invalid names, email, and phone", () => {
   assert.ok(errors.some((error) => error.field === "firstName"));
   assert.ok(errors.some((error) => error.field === "email"));
   assert.ok(errors.some((error) => error.field === "phone"));
+});
+
+const validPasswordChange = {
+  currentPassword: "userPassword123!",
+  newPassword: "newPassword123!",
+  confirmNewPassword: "newPassword123!",
+};
+
+test("password change accepts a valid payload", () => {
+  const { errors, value } = validateChangePassword(validPasswordChange);
+  assert.equal(errors.length, 0);
+  assert.equal(value.newPassword, "newPassword123!");
+});
+
+test("password change accepts confirmPassword as an alias", () => {
+  const { errors } = validateChangePassword({
+    currentPassword: "userPassword123!",
+    newPassword: "newPassword123!",
+    confirmPassword: "newPassword123!",
+  });
+  assert.equal(errors.length, 0);
+});
+
+test("password change requires all three fields", () => {
+  const { errors } = validateChangePassword({});
+  assert.ok(errors.some((error) => error.field === "currentPassword"));
+  assert.ok(errors.some((error) => error.field === "newPassword"));
+  assert.ok(errors.some((error) => error.field === "confirmNewPassword"));
+});
+
+test("password change rejects a short new password", () => {
+  const { errors } = validateChangePassword({
+    ...validPasswordChange,
+    newPassword: "short",
+    confirmNewPassword: "short",
+  });
+  assert.ok(errors.some((error) => error.field === "newPassword"));
+});
+
+test("password change rejects mismatched confirmation", () => {
+  const { errors } = validateChangePassword({
+    ...validPasswordChange,
+    confirmNewPassword: "otherPassword123!",
+  });
+  assert.ok(errors.some((error) => error.field === "confirmNewPassword"));
+});
+
+test("password change rejects reusing the current password", () => {
+  const { errors } = validateChangePassword({
+    currentPassword: "userPassword123!",
+    newPassword: "userPassword123!",
+    confirmNewPassword: "userPassword123!",
+  });
+  assert.ok(errors.some((error) => error.field === "newPassword"));
 });

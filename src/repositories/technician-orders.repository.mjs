@@ -7,6 +7,11 @@ const JOB_COLUMNS = `
   assignment.status AS "assignmentStatus",
   assignment.assigned_at AS "assignedAt",
   assignment.completed_at AS "completedAt",
+  (
+    SELECT COUNT(*)::int
+    FROM order_assignment_completion_images completion_image
+    WHERE completion_image.assignment_id = assignment.assignment_id
+  ) AS "completionImageCount",
   orders.order_id::text AS "orderId",
   COALESCE(orders.order_code, 'HS-' || orders.order_id::text) AS "orderCode",
   orders.status AS "orderStatus",
@@ -45,6 +50,7 @@ function toJob(row, items = []) {
     assignmentStatus: row.assignmentStatus ?? undefined,
     assignedAt: row.assignedAt ?? undefined,
     completedAt: row.completedAt ?? null,
+    completionImageCount: Number(row.completionImageCount ?? 0),
     orderId: String(row.orderId),
     orderCode: row.orderCode,
     orderStatus: row.orderStatus,
@@ -338,7 +344,12 @@ export async function findTechnicianJobs({ technicianId, serviceId, search, sort
   let orderBy = "assignment.assigned_at DESC NULLS LAST";
   if (sort === "newest") orderBy = "assignment.assigned_at DESC NULLS LAST";
   if (sort === "oldest") orderBy = "assignment.assigned_at ASC NULLS LAST";
-  if (sort === "nearest") orderBy = "orders.scheduled_at ASC NULLS LAST";
+  if (sort === "nearest") {
+    orderBy = `
+      CASE WHEN orders.scheduled_at >= NOW() THEN 0 ELSE 1 END ASC,
+      ABS(EXTRACT(EPOCH FROM orders.scheduled_at - NOW())) ASC NULLS LAST
+    `;
+  }
 
   const result = await query(
     `
@@ -377,4 +388,191 @@ export async function findTechnicianJob({ technicianId, assignmentId }) {
 
   const rows = await withItems(result.rows);
   return rows[0] ?? null;
+}
+
+export async function findCompletionUploadTarget({ technicianId, assignmentId }) {
+  const result = await query(
+    `
+      SELECT
+        assignment.assignment_id::text AS "assignmentId",
+        assignment.status,
+        COUNT(completion_image.image_id)::int AS "imageCount"
+      FROM order_assignment assignment
+      LEFT JOIN order_assignment_completion_images completion_image
+        ON completion_image.assignment_id = assignment.assignment_id
+      WHERE assignment.assignment_id = $1
+        AND assignment.technician_id = $2
+      GROUP BY assignment.assignment_id, assignment.status
+      LIMIT 1
+    `,
+    [assignmentId, technicianId],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function addCompletionImages({
+  technicianId,
+  assignmentId,
+  objectPaths,
+  maxImages = 5,
+}) {
+  return runTransaction(async (client) => {
+    const assignmentResult = await client.query(
+      `
+        SELECT assignment_id, status
+        FROM order_assignment
+        WHERE assignment_id = $1
+          AND technician_id = $2
+        FOR UPDATE
+      `,
+      [assignmentId, technicianId],
+    );
+    const assignment = assignmentResult.rows[0];
+    if (!assignment) return { error: "JOB_NOT_FOUND" };
+
+    const status = String(assignment.status).toUpperCase();
+    if (status === "COMPLETED") return { error: "JOB_ALREADY_COMPLETED" };
+    if (!["ACCEPTED", "IN_PROGRESS"].includes(status)) {
+      return { error: "INVALID_JOB_STATUS" };
+    }
+
+    const existingResult = await client.query(
+      `
+        SELECT COALESCE(MAX(sort_order), 0)::int AS "lastSortOrder",
+               COUNT(*)::int AS "imageCount"
+        FROM order_assignment_completion_images
+        WHERE assignment_id = $1
+      `,
+      [assignmentId],
+    );
+    const existing = existingResult.rows[0];
+    if (existing.imageCount + objectPaths.length > maxImages) {
+      return { error: "TOO_MANY_COMPLETION_IMAGES" };
+    }
+
+    const images = [];
+    for (let index = 0; index < objectPaths.length; index += 1) {
+      const inserted = await client.query(
+        `
+          INSERT INTO order_assignment_completion_images (
+            assignment_id,
+            object_path,
+            sort_order
+          )
+          VALUES ($1, $2, $3)
+          RETURNING
+            image_id::text AS "imageId",
+            object_path AS "objectPath",
+            sort_order AS "sortOrder",
+            created_at AS "createdAt"
+        `,
+        [assignmentId, objectPaths[index], existing.lastSortOrder + index + 1],
+      );
+      images.push(inserted.rows[0]);
+    }
+
+    return {
+      error: null,
+      images,
+      imageCount: existing.imageCount + images.length,
+    };
+  });
+}
+
+export async function findCompletionImagePaths({ technicianId, assignmentId }) {
+  const result = await query(
+    `
+      SELECT
+        completion_image.image_id::text AS "imageId",
+        completion_image.object_path AS "objectPath",
+        completion_image.sort_order AS "sortOrder",
+        completion_image.created_at AS "createdAt"
+      FROM order_assignment_completion_images completion_image
+      JOIN order_assignment assignment
+        ON assignment.assignment_id = completion_image.assignment_id
+      WHERE assignment.assignment_id = $1
+        AND assignment.technician_id = $2
+      ORDER BY completion_image.sort_order ASC
+    `,
+    [assignmentId, technicianId],
+  );
+  return result.rows;
+}
+
+export function getCompletionValidationError({
+  status,
+  imageCount,
+  minimumImages = 3,
+}) {
+  const normalizedStatus = String(status).toUpperCase();
+  if (normalizedStatus === "COMPLETED") return "JOB_ALREADY_COMPLETED";
+  if (!["ACCEPTED", "IN_PROGRESS"].includes(normalizedStatus)) {
+    return "INVALID_JOB_STATUS";
+  }
+  if (imageCount < minimumImages) {
+    return "MINIMUM_COMPLETION_IMAGES_REQUIRED";
+  }
+  return null;
+}
+
+export async function completeJobForTechnician({
+  technicianId,
+  assignmentId,
+  minimumImages = 3,
+}, transactionRunner = runTransaction) {
+  return transactionRunner(async (client) => {
+    const result = await client.query(
+      `
+        SELECT
+          assignment.assignment_id,
+          assignment.order_id,
+          assignment.status,
+          (
+            SELECT COUNT(*)::int
+            FROM order_assignment_completion_images completion_image
+            WHERE completion_image.assignment_id = assignment.assignment_id
+          ) AS "imageCount"
+        FROM order_assignment assignment
+        JOIN orders ON orders.order_id = assignment.order_id
+        WHERE assignment.assignment_id = $1
+          AND assignment.technician_id = $2
+        FOR UPDATE OF assignment
+      `,
+      [assignmentId, technicianId],
+    );
+    const assignment = result.rows[0];
+    if (!assignment) return { error: "JOB_NOT_FOUND" };
+
+    const validationError = getCompletionValidationError({
+      status: assignment.status,
+      imageCount: assignment.imageCount,
+      minimumImages,
+    });
+    if (validationError) {
+      return {
+        error: validationError,
+        imageCount: assignment.imageCount,
+      };
+    }
+
+    await client.query(
+      `
+        UPDATE order_assignment
+        SET status = 'COMPLETED', completed_at = now()
+        WHERE assignment_id = $1
+      `,
+      [assignmentId],
+    );
+    await client.query(
+      `UPDATE orders SET status = 'completed' WHERE order_id = $1`,
+      [assignment.order_id],
+    );
+
+    return {
+      error: null,
+      assignmentId: assignment.assignment_id,
+      orderId: assignment.order_id,
+      imageCount: assignment.imageCount,
+    };
+  });
 }

@@ -1,6 +1,9 @@
 import { query } from "../configs/db.mjs";
 import { HttpError } from "../utils/http-error.mjs";
-import { nextAvailableUsername, usernameFromEmail } from "../utils/username.mjs";
+import {
+  nextAvailableUsername,
+  usernameFromEmail,
+} from "../utils/username.mjs";
 
 const PROFILE_COLUMNS = `
   user_id AS id,
@@ -51,7 +54,10 @@ async function allocateUniqueUsername(preferred) {
     [base],
   );
 
-  return nextAvailableUsername(base, result.rows.map((row) => row.username));
+  return nextAvailableUsername(
+    base,
+    result.rows.map((row) => row.username),
+  );
 }
 
 function isUniqueViolation(error, column) {
@@ -141,7 +147,9 @@ export async function createUser({
     }
 
     if (isUniqueViolation(error, "username")) {
-      uname = await allocateUniqueUsername(`${preferred}_${Date.now().toString(36)}`);
+      uname = await allocateUniqueUsername(
+        `${preferred}_${Date.now().toString(36)}`,
+      );
       return insertUser({
         username: uname,
         password,

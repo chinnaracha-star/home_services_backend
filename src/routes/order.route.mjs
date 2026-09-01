@@ -1,9 +1,21 @@
 import { Router } from "express";
-import { checkoutController, postOrderController, postOrderItemController } from "../controllers/order.controller.mjs";
+import { 
+  checkoutController, 
+  postOrderController, 
+  postOrderItemController,
+  getUserOrdersController,
+  getOrderByIdController,
+} from "../controllers/order.controller.mjs";
 
 import { protect } from "../middlewares/protect.middleware.mjs";
 
 const orderRouter = Router();
+
+// GET /api/orders - get all orders for the current user
+orderRouter.get("/", protect, getUserOrdersController);
+
+// GET /api/orders/:id - get single order by ID or order code
+orderRouter.get("/:id", protect, getOrderByIdController);
 
 // POST /api/orders/checkout - create every checkout record in one transaction
 orderRouter.post("/checkout", checkoutController);
@@ -15,3 +27,4 @@ orderRouter.post("/", postOrderController);
 orderRouter.post("/order-item", postOrderItemController);
 
 export default orderRouter;
+
