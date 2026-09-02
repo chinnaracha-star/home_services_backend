@@ -5,11 +5,12 @@ export function createProtect({
   authClient = supabase,
   findById = findUserById,
   findByEmail = findUserByEmail,
+  allowDevUserId = process.env.NODE_ENV !== "production",
 } = {}) {
   return async function protect(req, res, next) {
     try {
       const devUserId = req.headers["x-user-id"];
-      if (devUserId) {
+      if (allowDevUserId && devUserId) {
         const devUser = await findById(devUserId);
         if (devUser) {
           req.user = devUser;

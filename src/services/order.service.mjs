@@ -6,6 +6,7 @@ import {
     getOrderByIdRepository,
 } from "../repositories/order.repository.mjs";
 import { toScheduledAt } from "../utils/schedule.mjs";
+import { getPaymentStatusFromStripe } from "./stripe.service.mjs";
 
 class CheckoutError extends Error {
     constructor(stage, message, { statusCode = 500, code = "CHECKOUT_FAILED" } = {}) {
@@ -49,12 +50,36 @@ function requireCoordinate(value, field, min, max) {
     return number;
 }
 
+async function verifyCardPayment(paymentIntentId, userId, totalAmount) {
+    if (typeof paymentIntentId !== "string" || paymentIntentId.trim().length === 0) {
+        throw new CheckoutError("payment", "paymentIntentId is required for card payments", {
+            statusCode: 400,
+            code: "INVALID_PAYMENT_DATA",
+        });
+    }
+
+    const paymentIntent = await getPaymentStatusFromStripe(paymentIntentId.trim());
+    if (paymentIntent.metadata?.userId !== String(userId)) {
+        throw new CheckoutError("payment", "Payment access is denied", {
+            statusCode: 403,
+            code: "FORBIDDEN",
+        });
+    }
+
+    if (paymentIntent.status !== "succeeded" || paymentIntent.amount !== Math.round(totalAmount * 100)) {
+        throw new CheckoutError("payment", "Card payment could not be verified", {
+            statusCode: 400,
+            code: "PAYMENT_NOT_VERIFIED",
+        });
+    }
+}
+
 /**
  * Persists a completed (or pending PromptPay) checkout atomically.  A failure
  * rolls back the order, all order items, payment record, and promotion quota.
  */
-export async function checkoutService(checkoutData) {
-    const userId = requirePositiveInteger(checkoutData.userId, "userId");
+export async function checkoutService(checkoutData, authenticatedUserId) {
+    const userId = requirePositiveInteger(authenticatedUserId, "authenticated user ID");
     const serviceId = requirePositiveInteger(checkoutData.serviceId, "serviceId");
     const totalAmount = Number(checkoutData.totalAmount);
     const discount = Number(checkoutData.discount || 0);
@@ -74,6 +99,26 @@ export async function checkoutService(checkoutData) {
         throw new CheckoutError("validation", "totalAmount and discount are invalid", {
             statusCode: 400,
             code: "INVALID_CHECKOUT_DATA",
+        });
+    }
+
+    if (paymentMethod === "card") {
+        if (paymentStatus !== "succeeded") {
+            throw new CheckoutError("payment", "Card payments must be completed before checkout", {
+                statusCode: 400,
+                code: "PAYMENT_NOT_VERIFIED",
+            });
+        }
+        await verifyCardPayment(checkoutData.paymentIntentId, userId, totalAmount);
+    } else if (paymentMethod === "promptpay" && paymentStatus !== "pending") {
+        throw new CheckoutError("payment", "PromptPay checkout must start as pending", {
+            statusCode: 400,
+            code: "INVALID_PAYMENT_DATA",
+        });
+    } else if (paymentMethod !== "card" && paymentMethod !== "promptpay") {
+        throw new CheckoutError("payment", "paymentMethod is invalid", {
+            statusCode: 400,
+            code: "INVALID_PAYMENT_DATA",
         });
     }
 

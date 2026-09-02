@@ -1,18 +1,16 @@
 import { Router } from "express";
 
 import { createPaymentIntent, getPaymentStatus, postPaymentController } from "../controllers/payment.controller.mjs";
+import { protect } from "../middlewares/protect.middleware.mjs";
 
 const paymentRouter = Router();
 
-// Note: Router is mounted at /api/payments in app.mjs
+// Note: Router is mounted at /api/payments in app.mjs.
+paymentRouter.post("/intent", protect, createPaymentIntent);
 
-// Public Stripe endpoints. The checkout flow does not require a signed-in user.
-paymentRouter.post("/intent", createPaymentIntent);
+paymentRouter.get("/status/:paymentIntentId", protect, getPaymentStatus);
 
-paymentRouter.get("/status/:paymentIntentId", getPaymentStatus);
-
-
-// POST /api/payment/post - Record created payment to DB
-paymentRouter.post("/post", postPaymentController);
+// POST /api/payments/post - Record created payment to DB
+paymentRouter.post("/post", protect, postPaymentController);
 
 export default paymentRouter;
