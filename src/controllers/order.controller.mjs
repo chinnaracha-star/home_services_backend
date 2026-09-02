@@ -13,7 +13,7 @@ function hasValue(value) {
 // ใช้อันนี้อันเดียว
 export async function checkoutController(req, res) {
     try {
-        const result = await checkoutService(req.body);
+        const result = await checkoutService(req.body, req.user?.id);
 
         return res.status(201).json({
             message: "Checkout recorded successfully",
@@ -51,7 +51,7 @@ export async function postOrderController(req, res) {
         }
 
         const orderData = {
-            user_id: req.body.userId,
+            user_id: req.user?.id,
             service_id: req.body.serviceId,
             status: req.body.status,
             total_price: req.body.totAmount,
@@ -99,6 +99,14 @@ export async function postOrderItemController(req, res) {
                     field,
                     message: `${field} is required`
                 }))
+            });
+        }
+
+        const order = await getOrderByIdService(req.body.order_id, req.user?.id);
+        if (!order) {
+            return res.status(403).json({
+                message: "Order not found or access is denied",
+                code: "FORBIDDEN",
             });
         }
 

@@ -1,12 +1,25 @@
 
 import { createToStripe, getPaymentStatusFromStripe } from "../services/stripe.service.mjs";
 import { postPaymentService } from "../services/payment.service.mjs";
+import { getOrderByIdService } from "../services/order.service.mjs";
+
+function getAuthenticatedUserId(req) {
+  const userId = Number(req.user?.id);
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    const error = new Error("Unauthorized");
+    error.statusCode = 401;
+    error.code = "UNAUTHORIZED";
+    throw error;
+  }
+  return userId;
+}
 
 
 
 export async function createPaymentIntent(req,res) {
   try {
     const { amount } = req.body;
+    const userId = getAuthenticatedUserId(req);
 
     // NEVER trust the amount coming from the frontend
     // in a real application.
@@ -18,7 +31,7 @@ export async function createPaymentIntent(req,res) {
       });
     }
 
-    const paymentIntent = await createToStripe(amount);
+    const paymentIntent = await createToStripe(amount, userId);
 
     res.json({
       clientSecret: paymentIntent.client_secret,
@@ -27,6 +40,13 @@ export async function createPaymentIntent(req,res) {
 
   } catch (error) {
     console.error(error);
+
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        code: error.code,
+      });
+    }
 
     res.status(500).json({
       error: error.message
@@ -37,6 +57,7 @@ export async function createPaymentIntent(req,res) {
 export async function getPaymentStatus(req, res) {
   try {
     const { paymentIntentId } = req.params;
+    const userId = getAuthenticatedUserId(req);
 
     if (!paymentIntentId) {
       return res.status(400).json({
@@ -45,6 +66,12 @@ export async function getPaymentStatus(req, res) {
     }
 
     const paymentIntent = await getPaymentStatusFromStripe(paymentIntentId);
+    if (paymentIntent.metadata?.userId !== String(userId)) {
+      return res.status(403).json({
+        error: "Payment access is denied",
+        code: "FORBIDDEN",
+      });
+    }
 
     res.json({
       paymentIntentId: paymentIntent.id,
@@ -55,6 +82,13 @@ export async function getPaymentStatus(req, res) {
 
   } catch (error) {
     console.error(error);
+
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        code: error.code,
+      });
+    }
 
     // Stripe throws this when the id doesn't correspond to an existing PaymentIntent
     if (error.code === "resource_missing") {
@@ -76,6 +110,7 @@ export async function getPaymentStatus(req, res) {
 export async function postPaymentController(req, res) {
     try {
         const { order_id, paymentMethod, paymentStatus, amount } = req.body;
+      const userId = getAuthenticatedUserId(req);
 
         const requiredFields = ['order_id', 'paymentMethod', 'paymentStatus', 'amount'];
         const missingFields = requiredFields.filter(field =>
@@ -99,6 +134,14 @@ export async function postPaymentController(req, res) {
                 code: "INVALID_ORDER_ID"
             });
         }
+
+          const order = await getOrderByIdService(order_id, userId);
+          if (!order) {
+            return res.status(403).json({
+              message: "Order not found or access is denied",
+              code: "FORBIDDEN",
+            });
+          }
 
         if (typeof paymentMethod !== 'string' || typeof paymentStatus !== 'string') {
             return res.status(400).json({
@@ -130,6 +173,12 @@ export async function postPaymentController(req, res) {
 
     } catch (error) {
         console.error("Error recording payment:", error);
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          message: error.message,
+          code: error.code,
+        });
+      }
         return res.status(500).json({
             message: "Server could not record payment",
             code: "PAYMENT_RECORD_FAILED",
