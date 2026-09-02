@@ -71,7 +71,7 @@ export async function checkoutService(checkoutData) {
     const items = checkoutData.items;
 
     if (!Number.isFinite(totalAmount) || totalAmount <= 0 || !Number.isFinite(discount) || discount < 0) {
-        throw new CheckoutError("validation", "totalAmount and discount are invalid", {
+        throw new CheckoutError("validation", "totalAmount must be a positive finite number and discount must be a non-negative finite number", {
             statusCode: 400,
             code: "INVALID_CHECKOUT_DATA",
         });

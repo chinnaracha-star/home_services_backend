@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { checkoutService } from "../src/services/order.service.mjs";
+import { info } from "node:console";
+import { runTransaction } from "../src/configs/db.mjs";
 
 vi.mock("../src/repositories/order.repository.mjs", () => ({
   checkout: vi.fn(),
@@ -7,22 +9,32 @@ vi.mock("../src/repositories/order.repository.mjs", () => ({
   postOrderItemRepository: vi.fn(),
 }));
 
+vi.mock("../src/configs/db.mjs", () => ({
+  runTransaction: vi.fn(),
+  pool: { query: vi.fn() },
+}));
+
 describe("checkoutService", () => {
-  it("rejects an invalid totalAmount", async () => {
+  // this one is already correct
+  it("totalAmount less than or equal to zero", async () => {
     const checkoutData = {
       userId: 1,
-      serviceId: 1,
-      totalAmount: 0,
-      discount: 0,
-      paymentMethod: "promptpay",
-      paymentStatus: "pending",
+      serviceId: 2,
+      totalAmount: 0, // totalAmount is zero
+      discount: 50,
       serviceDate: "2026-09-10",
-      serviceTime: "10:00",
-      address: "123 Main Street",
-      province: "Bangkok",
-      district: "Pathum Wan",
-      subdistrict: "Lumphini",
-      items: [{ optionId: 1, quantity: 1, unitPrice: 500 }],
+      serviceTime: "10:00:00",
+      address: "อาคารเดอะ ธารา เลขที่ 58/28 หมู่ 2 ถนนแจ้งวัฒนะ",
+      province: "นนทบุรี",
+      district: "ปากเกร็ด",
+      subdistrict: "บางตลาด",
+      latitude:13.901594444863845,
+      longitude: 100.53133999511452,
+      information: "",
+      promotionCode: "HOME2012",
+      paymentMethod: "card",
+      paymentStatus: "succeeded",
+      items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
     await expect(checkoutService(checkoutData)).rejects.toMatchObject({
@@ -34,30 +46,147 @@ describe("checkoutService", () => {
       code: "INVALID_CHECKOUT_DATA",
     });
   });
-});
 
-// ใช้วิธีเดียวกับอันที่ 2
-test("items is not an array or items.length===0", () => {});
-
-// ใช้วิธีเดียวกับอันที่ 2
-test("item.optionId <= 0", () => {});
-
-// ใช้วิธีเดียวกับอันที่ 2
-test("item.quantity <= 0", () => {});
-
-// ใช้วิธีเดียวกับอันที่ 2
-test("item.unitPrice <= 0", () => {});
-
-test("promotion_id is not available in promotions table", () => {
-    const requestBody = {
-        ...validCheckoutPayload,
-        promotionCode: "???",
+  it("items is not an array or items.length===0", async () => {
+    const checkoutData = {
+      userId: 1,
+      serviceId: 2,
+      totalAmount: 1000, 
+      discount: 50,
+      serviceDate: "2026-09-10",
+      serviceTime: "10:00:00",
+      address: "อาคารเดอะ ธารา เลขที่ 58/28 หมู่ 2 ถนนแจ้งวัฒนะ",
+      province: "นนทบุรี",
+      district: "ปากเกร็ด",
+      subdistrict: "บางตลาด",
+      latitude:13.901594444863845,
+      longitude: 100.53133999511452,
+      information: "",
+      promotionCode: "HOME2012",
+      paymentMethod: "card",
+      paymentStatus: "succeeded",
+      items: [], // items array is empty
     };
+
+    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+      name: "CheckoutError",
+      stage: "order_items",
+      message:
+        "At least one order item is required",
+      statusCode: 400,
+      code: "INVALID_ORDER_ITEMS",
+    });
+  });
+
+  // at repository level: exercise the real `checkout` implementation, mocking
+  // only the database transaction, not the repository module itself.
+  // unit test: do not call real checkout function
+  it("promotion_id is not available in promotions table", async () => {
+    const mockClient = {
+      // simulate no matching row for the promotion lookup query
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+    };
+    runTransaction.mockImplementation((callback) => callback(mockClient));
+
+    const { checkout } = await vi.importActual(
+      "../src/repositories/order.repository.mjs",
+    );
+
+    const checkoutData = {
+      userId: 1,
+      serviceId: 2,
+      totalAmount: 1000,
+      discount: 50,
+      serviceDate: "2026-09-10",
+      serviceTime: "10:00:00",
+      address: "อาคารเดอะ ธารา เลขที่ 58/28 หมู่ 2 ถนนแจ้งวัฒนะ",
+      province: "นนทบุรี",
+      district: "ปากเกร็ด",
+      subdistrict: "บางตลาด",
+      latitude:13.901594444863845,
+      longitude: 100.53133999511452,
+      information: "",
+      promotionCode: "???",
+      paymentMethod: "card",
+      paymentStatus: "succeeded",
+      items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
+    };
+
+    await expect(checkout(checkoutData)).rejects.toMatchObject({
+      stage: "promotion",
+      message: "Promotion code was not found or is inactive",
+      statusCode: 400,
+      code: "INVALID_PROMOTION",
+    });
+
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining("FROM promotions"),
+      ["???"],
+    );
+  });
+
+
+  // integration test : call real checkout function
+  it("promotion's used quota is over quota", async () => {
+    const mockClient = {
+      // simulate a promotion row whose used quota already reached its limit
+      query: vi
+        .fn()
+        .mockResolvedValue({ rows: [{ promotion_id: 5, quota: 10, quota_used: 10 }] }),
+    };
+    runTransaction.mockImplementation((callback) => callback(mockClient));
+
+    const { checkout } = await vi.importActual(
+      "../src/repositories/order.repository.mjs",
+    );
+
+    const checkoutData = {
+      userId: 1,
+      serviceId: 2,
+      totalAmount: 1000,
+      discount: 50,
+      serviceDate: "2026-09-10",
+      serviceTime: "10:00:00",
+      address: "อาคารเดอะ ธารา เลขที่ 58/28 หมู่ 2 ถนนแจ้งวัฒนะ",
+      province: "นนทบุรี",
+      district: "ปากเกร็ด",
+      subdistrict: "บางตลาด",
+      latitude:13.901594444863845,
+      longitude: 100.53133999511452,
+      information: "",
+      promotionCode: "ONEPRO002", // this promotion used quota is full
+      paymentMethod: "card",
+      paymentStatus: "succeeded",
+      items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
+    };
+
+    await expect(checkout(checkoutData)).rejects.toMatchObject({
+      stage: "promotion",
+      message: "Promotion code quota has been reached",
+      statusCode: 409,
+      code: "PROMOTION_QUOTA_EXCEEDED",
+    });
+
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining("FROM promotions"),
+      ["ONEPRO002"],
+    );
+  });
+
 });
 
-test("promotion's used quota is over quota", () => {
-    const requestBody = {
-        ...validCheckoutPayload,
-        promotionCode: "ONEPRO002",
-    };
-});
+
+
+
+// ใช้วิธีเดียวกับอันที่ 2
+it("item.optionId <= 0", async () => {});
+
+// ใช้วิธีเดียวกับอันที่ 2
+it("item.quantity <= 0", async () => {});
+
+// ใช้วิธีเดียวกับอันที่ 2
+it("item.unitPrice <= 0", async () => {});
+
+
+
+
