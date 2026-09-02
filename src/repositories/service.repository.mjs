@@ -2,9 +2,9 @@ import { query } from "../configs/db.mjs";
 
 const SUMMARY_COLUMNS = `
   service.service_id::text AS id,
-  service.service_name AS name,
+  COALESCE(service_translation.name, service.service_name) AS name,
   category.category_id::text AS "categoryId",
-  category.name AS category,
+  COALESCE(category_translation.name, category.name) AS category,
   service.image_url AS "imageUrl",
   COALESCE(MIN(option.price), 0)::float8 AS "minPrice",
   COALESCE(MAX(option.price), 0)::float8 AS "maxPrice",
@@ -18,8 +18,10 @@ const SUMMARY_COLUMNS = `
 const SUMMARY_GROUP = `
   service.service_id,
   service.service_name,
+  service_translation.name,
   category.category_id,
   category.name,
+  category_translation.name,
   service.image_url,
   service.is_featured,
   service.display_order,
@@ -28,12 +30,18 @@ const SUMMARY_GROUP = `
   r.count_reviews
 `;
 
-export async function findServices({ featured, limit }) {
+export async function findServices({ featured, limit, locale = "th" }) {
   const result = await query(
     `
       SELECT ${SUMMARY_COLUMNS}
       FROM services service
       JOIN categories category ON category.category_id = service.category_id
+      LEFT JOIN service_translations service_translation
+        ON service_translation.service_id = service.service_id
+       AND service_translation.locale = $3
+      LEFT JOIN category_translations category_translation
+        ON category_translation.category_id = category.category_id
+       AND category_translation.locale = $3
       LEFT JOIN service_options option ON option.service_id = service.service_id
       LEFT JOIN LATERAL (
         SELECT 
@@ -49,17 +57,23 @@ export async function findServices({ featured, limit }) {
       ORDER BY service.display_order ASC, service.service_id ASC
       LIMIT $2
     `,
-    [featured, limit],
+    [featured, limit, locale],
   );
   return result.rows;
 }
 
-export async function findServiceById(serviceId) {
+export async function findServiceById(serviceId, locale = "th") {
   const result = await query(
     `
       SELECT ${SUMMARY_COLUMNS}
       FROM services service
       JOIN categories category ON category.category_id = service.category_id
+      LEFT JOIN service_translations service_translation
+        ON service_translation.service_id = service.service_id
+       AND service_translation.locale = $2
+      LEFT JOIN category_translations category_translation
+        ON category_translation.category_id = category.category_id
+       AND category_translation.locale = $2
       LEFT JOIN service_options option ON option.service_id = service.service_id
       LEFT JOIN LATERAL (
         SELECT 
@@ -72,21 +86,27 @@ export async function findServiceById(serviceId) {
       GROUP BY ${SUMMARY_GROUP}
       LIMIT 1
     `,
-    [serviceId],
+    [serviceId, locale],
   );
   return result.rows[0] ?? null;
 }
 
-export async function findServiceOptions(serviceId) {
+export async function findServiceOptions(serviceId, locale = "th") {
   const result = await query(
     `
-      SELECT option_id::text AS id, option_name AS name,
-             price::float8 AS price, unit
-      FROM service_options
-      WHERE service_id = $1
-      ORDER BY option_id ASC
+      SELECT
+        option.option_id::text AS id,
+        COALESCE(option_translation.name, option.option_name) AS name,
+        option.price::float8 AS price,
+        COALESCE(option_translation.unit, option.unit) AS unit
+      FROM service_options option
+      LEFT JOIN service_option_translations option_translation
+        ON option_translation.option_id = option.option_id
+       AND option_translation.locale = $2
+      WHERE option.service_id = $1
+      ORDER BY option.option_id ASC
     `,
-    [serviceId],
+    [serviceId, locale],
   );
   return result.rows;
 }
@@ -94,18 +114,29 @@ export async function findServiceOptions(serviceId) {
 
 // for service option
 
-export async function getServiceOptionRepository(serviceId) {
+export async function getServiceOptionRepository(serviceId, locale = "th") {
   const result = await query(
     `
-    SELECT s.service_id, s.service_name, so.option_id, so.option_name, so.price, so.unit
+    SELECT
+      s.service_id,
+      COALESCE(st.name, s.service_name) AS service_name,
+      so.option_id,
+      COALESCE(sot.name, so.option_name) AS option_name,
+      so.price,
+      COALESCE(sot.unit, so.unit) AS unit
     FROM services AS s
     INNER JOIN service_options AS so
     ON s.service_id = so.service_id
+    LEFT JOIN service_translations AS st
+      ON st.service_id = s.service_id
+     AND st.locale = $2
+    LEFT JOIN service_option_translations AS sot
+      ON sot.option_id = so.option_id
+     AND sot.locale = $2
     WHERE s.service_id=$1
     ;
     `,
-    [serviceId],
+    [serviceId, locale],
   );
   return result.rows ?? null;
 }
-

@@ -18,13 +18,13 @@ orderRouter.get("/", protect, getUserOrdersController);
 orderRouter.get("/:id", protect, getOrderByIdController);
 
 // POST /api/orders/checkout - create every checkout record in one transaction
-orderRouter.post("/checkout", checkoutController);
+orderRouter.post("/checkout", protect, checkoutController);
 
 // POST /api/orders
-orderRouter.post("/", postOrderController);
+orderRouter.post("/", protect, postOrderController);
 
 // PUT /api/order-item
-orderRouter.post("/order-item", postOrderItemController);
+orderRouter.post("/order-item", protect, postOrderItemController);
 
 export default orderRouter;
 

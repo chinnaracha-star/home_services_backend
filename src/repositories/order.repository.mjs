@@ -11,14 +11,15 @@ function checkoutError(stage, message, { statusCode = 500, code = "CHECKOUT_FAIL
 export async function checkout(checkoutData) {
     return runTransaction(async (client) => {
         let promotion = null;
+        const promotionCode = typeof checkoutData.promotionCode === "string" ? checkoutData.promotionCode.trim() : checkoutData.promotionCode;
 
-        if (checkoutData.promotionCode) {
+        if (promotionCode) {
             const promotionResult = await client.query(
                 `SELECT promotion_id, quota, quota_used
                  FROM promotions
                  WHERE UPPER(promotion_code) = UPPER($1) AND status = 'active'
                  FOR UPDATE`,
-                [checkoutData.promotionCode],
+                [promotionCode],
             );
             promotion = promotionResult.rows[0];
 

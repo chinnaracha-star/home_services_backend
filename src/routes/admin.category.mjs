@@ -13,6 +13,10 @@ import {
   validateUpdateCategory,
   validateIdParam,
 } from "../validators/category.validator.mjs";
+import {
+  getCategoryTranslations,
+  putCategoryTranslation,
+} from "../controllers/admin-translation.controller.mjs";
 
 export const adminCategoryRouter = express.Router();
 
@@ -20,6 +24,11 @@ export const adminCategoryRouter = express.Router();
 adminCategoryRouter.use(protect, requireAdmin);
 
 adminCategoryRouter.get("/", getCategories);
+adminCategoryRouter.get("/:id/translations", getCategoryTranslations);
+adminCategoryRouter.put(
+  "/:id/translations/:locale",
+  putCategoryTranslation,
+);
 adminCategoryRouter.get("/:id", validateIdParam, getCategoryById);
 adminCategoryRouter.post("/", validateCreateCategory, createCategory);
 adminCategoryRouter.patch("/:id", validateUpdateCategory, updateCategory);
