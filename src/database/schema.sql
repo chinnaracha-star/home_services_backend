@@ -21,6 +21,61 @@ CREATE TABLE IF NOT EXISTS categories (
 
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
 
+CREATE TABLE IF NOT EXISTS category_translations (
+  category_id INTEGER NOT NULL,
+  locale VARCHAR(10) NOT NULL CHECK (locale IN ('th', 'en')),
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (category_id, locale),
+  CONSTRAINT category_translations_category_id_fkey
+    FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS service_translations (
+  service_id BIGINT NOT NULL,
+  locale VARCHAR(10) NOT NULL CHECK (locale IN ('th', 'en')),
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (service_id, locale)
+);
+
+CREATE TABLE IF NOT EXISTS service_option_translations (
+  option_id BIGINT NOT NULL,
+  locale VARCHAR(10) NOT NULL CHECK (locale IN ('th', 'en')),
+  name VARCHAR(255) NOT NULL,
+  unit VARCHAR(100),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (option_id, locale)
+);
+
+DO $$
+BEGIN
+  IF to_regclass('public.services') IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'service_translations_service_id_fkey'
+    )
+  THEN
+    ALTER TABLE service_translations
+      ADD CONSTRAINT service_translations_service_id_fkey
+      FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE;
+  END IF;
+
+  IF to_regclass('public.service_options') IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'service_option_translations_option_id_fkey'
+    )
+  THEN
+    ALTER TABLE service_option_translations
+      ADD CONSTRAINT service_option_translations_option_id_fkey
+      FOREIGN KEY (option_id) REFERENCES service_options(option_id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS promotions (
   promotion_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   promotion_code VARCHAR(255) NOT NULL,

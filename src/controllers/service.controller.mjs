@@ -11,7 +11,7 @@ export async function getServices(req, res, next) {
 
 export async function getServiceById(req, res, next) {
   try {
-    const service = await getService(req.params.serviceId);
+    const service = await getService(req.params.serviceId, req.query.locale);
     res.status(200).json({ data: service, message: "Success" });
   } catch (error) {
     next(error);
@@ -21,7 +21,10 @@ export async function getServiceById(req, res, next) {
 // for service option
 export async function getServiceOptionController(req, res) {
   try {
-    const serviceOption = await getServiceOptionService(req.params.serviceId);
+    const serviceOption = await getServiceOptionService(
+      req.params.serviceId,
+      req.query.locale,
+    );
     return res.status(200).json({ 
       data: serviceOption 
     });
