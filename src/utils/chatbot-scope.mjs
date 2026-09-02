@@ -4,8 +4,8 @@ const HOME_SERVICE_TERMS = [
 ];
 
 const CLEARLY_UNRELATED_TERMS = [
-  /เขียนโปรแกรม|เขียนโค้ด|การบ้าน|หุ้น|แต่งเพลง|ประธานาธิบดี|ดูดวง|ฟุตบอล/u,
-  /write (?:code|a program)|homework|stock market|compose a song|president|horoscope|football/i,
+  /เขียนโปรแกรม|เขียนโค้ด|เขียน\s*(?:React|component)|การบ้าน|หุ้น|แต่งเพลง|ประธานาธิบดี|ดูดวง|ฟุตบอล/iu,
+  /write (?:code|a program|a component)|React component|homework|stock market|compose a song|president|horoscope|football/i,
 ];
 
 export function detectChatLanguage(message) {
@@ -15,4 +15,11 @@ export function detectChatLanguage(message) {
 export function isClearlyOutOfScope(message) {
   if (HOME_SERVICE_TERMS.some((pattern) => pattern.test(message))) return false;
   return CLEARLY_UNRELATED_TERMS.some((pattern) => pattern.test(message));
+}
+
+export function isBookingActionRequest(message) {
+  return [
+    /(?:ช่วย|กรุณา).*(?:จอง|สั่ง|ยกเลิก|เลื่อน|เปลี่ยนวัน).*(?:ให้|แทน)|(?:จอง|สั่ง|ยกเลิก|เลื่อน|เปลี่ยนวัน).*(?:ให้หน่อย|แทน)/u,
+    /(?:book|order|cancel|reschedule|change).*(?:for me|on my behalf)/i,
+  ].some((pattern) => pattern.test(message));
 }

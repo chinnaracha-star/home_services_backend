@@ -37,7 +37,6 @@ export async function requestOpenRouter({ messages, responseFormat, validate }) 
           messages,
           max_tokens: 500,
           temperature: 0.2,
-          reasoning: { effort: "none" },
           ...(responseFormat ? { response_format: responseFormat } : {}),
           ...(responseFormat ? { provider: { require_parameters: true } } : {}),
         },

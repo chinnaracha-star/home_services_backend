@@ -12,7 +12,11 @@ import {
   saveConversationExchange,
 } from "../repositories/ai-chat.repository.mjs";
 import { searchChatbotServices } from "../repositories/chatbot-context.repository.mjs";
-import { detectChatLanguage, isClearlyOutOfScope } from "../utils/chatbot-scope.mjs";
+import {
+  detectChatLanguage,
+  isBookingActionRequest,
+  isClearlyOutOfScope,
+} from "../utils/chatbot-scope.mjs";
 import { HttpError } from "../utils/http-error.mjs";
 import { requestOpenRouter } from "./openrouter.service.mjs";
 
@@ -131,6 +135,17 @@ export async function sendChatMessage({ message, requestId, conversationId, hist
   }
 
   const detectedLanguage = detectChatLanguage(message);
+  if (isBookingActionRequest(message)) {
+    const reply = BOOKING_ACTION_MESSAGES[detectedLanguage];
+    const persisted = await persistReply(
+      user,
+      storedConversation?.conversationId,
+      requestId,
+      message,
+      reply,
+    );
+    return { message: persisted.message, conversationId: persisted.conversationId };
+  }
   if (isClearlyOutOfScope(message)) {
     const reply = OUT_OF_SCOPE_MESSAGES[detectedLanguage];
     const persisted = await persistReply(

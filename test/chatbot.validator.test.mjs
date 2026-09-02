@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { validateChatRequest } from "../src/validators/chatbot.validator.mjs";
 import {
   detectChatLanguage,
+  isBookingActionRequest,
   isClearlyOutOfScope,
 } from "../src/utils/chatbot-scope.mjs";
 import { BOOKING_ACTION_MESSAGES } from "../src/constants/chatbot.constants.mjs";
@@ -40,6 +41,7 @@ test("chatbot request rejects empty, oversized, and invalid conversation inputs"
 
 test("scope guard rejects only clearly unrelated messages", () => {
   assert.equal(isClearlyOutOfScope("ช่วยเขียนโปรแกรมให้หน่อย"), true);
+  assert.equal(isClearlyOutOfScope("ช่วยเขียน React component ให้หน่อย"), true);
   assert.equal(isClearlyOutOfScope("ล้างแอร์ราคาเท่าไหร่"), false);
   assert.equal(isClearlyOutOfScope("สวัสดีครับ"), false);
   assert.equal(detectChatLanguage("มีบริการอะไรบ้าง"), "th");
@@ -49,4 +51,11 @@ test("scope guard rejects only clearly unrelated messages", () => {
 test("booking action fallback states that the assistant cannot create orders", () => {
   assert.match(BOOKING_ACTION_MESSAGES.th, /ไม่สามารถจองบริการหรือสร้างคำสั่งซื้อ/);
   assert.match(BOOKING_ACTION_MESSAGES.en, /cannot book a service or create an order/);
+});
+
+test("booking action guard distinguishes actions from booking guidance", () => {
+  assert.equal(isBookingActionRequest("ช่วยจองบริการล้างแอร์ให้หน่อย"), true);
+  assert.equal(isBookingActionRequest("ช่วยยกเลิกออเดอร์แทนฉัน"), true);
+  assert.equal(isBookingActionRequest("จองบริการอย่างไร"), false);
+  assert.equal(isBookingActionRequest("Please book air-con cleaning for me"), true);
 });
