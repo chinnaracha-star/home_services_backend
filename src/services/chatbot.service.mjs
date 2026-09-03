@@ -2,6 +2,7 @@ import {
   BOOKING_ACTION_MESSAGES,
   OUT_OF_SCOPE_MESSAGES,
   SERVICE_NOT_FOUND_MESSAGES,
+  SMALL_TALK_MESSAGES,
 } from "../constants/chatbot.constants.mjs";
 import { buildAnswerPrompt, CLASSIFIER_PROMPT } from "../prompts/home-service.prompt.mjs";
 import {
@@ -14,8 +15,10 @@ import {
 import { searchChatbotServices } from "../repositories/chatbot-context.repository.mjs";
 import {
   detectChatLanguage,
+  isGreeting,
   isBookingActionRequest,
   isClearlyOutOfScope,
+  isThanks,
 } from "../utils/chatbot-scope.mjs";
 import { HttpError } from "../utils/http-error.mjs";
 import { requestOpenRouter } from "./openrouter.service.mjs";
@@ -135,6 +138,20 @@ export async function sendChatMessage({ message, requestId, conversationId, hist
   }
 
   const detectedLanguage = detectChatLanguage(message);
+  const greeting = isGreeting(message);
+  const thanks = isThanks(message);
+  if (greeting || thanks) {
+    const type = greeting && thanks ? "greetingThanks" : greeting ? "greeting" : "thanks";
+    const reply = SMALL_TALK_MESSAGES[detectedLanguage][type];
+    const persisted = await persistReply(
+      user,
+      storedConversation?.conversationId,
+      requestId,
+      message,
+      reply,
+    );
+    return { message: persisted.message, conversationId: persisted.conversationId };
+  }
   if (isBookingActionRequest(message)) {
     const reply = BOOKING_ACTION_MESSAGES[detectedLanguage];
     const persisted = await persistReply(

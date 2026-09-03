@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { validateChatRequest } from "../src/validators/chatbot.validator.mjs";
 import {
   detectChatLanguage,
+  isGreeting,
   isBookingActionRequest,
   isClearlyOutOfScope,
+  isThanks,
 } from "../src/utils/chatbot-scope.mjs";
-import { BOOKING_ACTION_MESSAGES } from "../src/constants/chatbot.constants.mjs";
+import { BOOKING_ACTION_MESSAGES, SMALL_TALK_MESSAGES } from "../src/constants/chatbot.constants.mjs";
 
 test("chatbot request trims valid input and limits client history", () => {
   const result = validateChatRequest({
@@ -58,4 +60,15 @@ test("booking action guard distinguishes actions from booking guidance", () => {
   assert.equal(isBookingActionRequest("ช่วยยกเลิกออเดอร์แทนฉัน"), true);
   assert.equal(isBookingActionRequest("จองบริการอย่างไร"), false);
   assert.equal(isBookingActionRequest("Please book air-con cleaning for me"), true);
+});
+
+test("small-talk guards recognize greetings and thanks without matching service questions", () => {
+  assert.equal(isGreeting("สวัสดีครับ"), true);
+  assert.equal(isGreeting("hello bot!"), true);
+  assert.equal(isThanks("ขอบคุณมากค่ะ"), true);
+  assert.equal(isThanks("thank you"), true);
+  assert.equal(isGreeting("สวัสดี ล้างแอร์ราคาเท่าไหร่"), false);
+  assert.equal(isThanks("ขอบคุณ แล้วล้างแอร์ราคาเท่าไหร่"), false);
+  assert.match(SMALL_TALK_MESSAGES.th.greeting, /สวัสดี/);
+  assert.match(SMALL_TALK_MESSAGES.th.thanks, /ยินดี/);
 });
