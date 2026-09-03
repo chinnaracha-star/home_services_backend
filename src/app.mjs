@@ -18,8 +18,13 @@ import addressRouter from "./routes/address.routes.mjs";
 import paymentRouter from "./routes/payment.route.mjs";
 import promotionRouter from "./routes/promotion.routes.mjs";
 import orderRouter from "./routes/order.route.mjs";
+import { chatbotRouter } from "./routes/chatbot.route.mjs";
 
 export const app = express();
+
+if (env.trustProxyHops > 0) {
+  app.set("trust proxy", env.trustProxyHops);
+}
 
 app.use(
   cors({
@@ -45,6 +50,7 @@ app.use("/api", addressRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/reviews", reviewRouter);
+app.use("/api/chat", chatbotRouter);
 
 app.use("/api/users", userRouter);
 app.use("/user", userRouter);
