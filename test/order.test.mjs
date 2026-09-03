@@ -15,7 +15,7 @@ vi.mock("../src/configs/db.mjs", () => ({
 }));
 
 describe("checkoutService", () => {
-  // this one is already correct
+  
   it("totalAmount less than or equal to zero", async () => {
     const checkoutData = {
       userId: 1,
@@ -37,7 +37,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -63,12 +63,12 @@ describe("checkoutService", () => {
       longitude: 100.53133999511452,
       information: "",
       promotionCode: "HOME2012",
-      paymentMethod: "card",
-      paymentStatus: "succeeded",
+      paymentMethod: "promptpay",
+      paymentStatus: "pending",
       items: [], // items array is empty
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "order_items",
       message:
@@ -94,12 +94,12 @@ describe("checkoutService", () => {
       longitude: 100.53133999511452,
       information: "",
       promotionCode: "HOME2012",
-      paymentMethod: "card",
-      paymentStatus: "succeeded",
+      paymentMethod: "promptpay",
+      paymentStatus: "pending",
       items: [{ optionId: 0, quantity: 1, unitPrice: 1000 }], // optionId is invalid
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -126,12 +126,12 @@ describe("checkoutService", () => {
       longitude: 100.53133999511452,
       information: "",
       promotionCode: "HOME2012",
-      paymentMethod: "card",
-      paymentStatus: "succeeded",
+      paymentMethod: "promptpay",
+      paymentStatus: "pending",
       items: [{ optionId: 3, quantity: 0, unitPrice: 1000 }], // quantity is invalid
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -157,12 +157,12 @@ describe("checkoutService", () => {
       longitude: 100.53133999511452,
       information: "",
       promotionCode: "HOME2012",
-      paymentMethod: "card",
-      paymentStatus: "succeeded",
+      paymentMethod: "promptpay",
+      paymentStatus: "pending",
       items: [{ optionId: 3, quantity: 1, unitPrice: -100 }], // unitPrice is invalid
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "order_items",
       message:
@@ -174,9 +174,7 @@ describe("checkoutService", () => {
 
 
 
-  // at repository level: exercise the real `checkout` implementation, mocking
-  // only the database transaction, not the repository module itself.
-  // unit test: do not call real checkout function
+  // integration test: exercise the real checkout implementation with a mocked database transaction
   it("promotion_id is not available in promotions table", async () => {
     const mockClient = {
       // simulate no matching row for the promotion lookup query
@@ -220,7 +218,6 @@ describe("checkoutService", () => {
       ["???"],
     );
   });
-
 
   // integration test : call real checkout function
   it("promotion's used quota is over quota", async () => {
@@ -293,7 +290,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -325,7 +322,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -356,7 +353,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -387,7 +384,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -419,7 +416,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -451,7 +448,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -483,7 +480,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -514,7 +511,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -545,7 +542,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
@@ -577,7 +574,7 @@ describe("checkoutService", () => {
       items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
     };
 
-    await expect(checkoutService(checkoutData)).rejects.toMatchObject({
+    await expect(checkoutService(checkoutData, checkoutData.userId)).rejects.toMatchObject({
       name: "CheckoutError",
       stage: "validation",
       message:
