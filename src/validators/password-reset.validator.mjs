@@ -1,6 +1,6 @@
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USER_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.com$/i;
-const MIN_PASSWORD_LENGTH = 12;
+const MIN_PASSWORD_LENGTH = 6;
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
