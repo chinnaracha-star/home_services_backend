@@ -34,8 +34,8 @@ test("reset password accepts matching new passwords", () => {
 
 test("reset password rejects a short password", () => {
   const { errors } = validateResetPassword({
-    newPassword: "short1",
-    confirmNewPassword: "short1",
+    newPassword: "short",
+    confirmNewPassword: "short",
   });
   assert.ok(errors.some((error) => error.field === "newPassword"));
 });

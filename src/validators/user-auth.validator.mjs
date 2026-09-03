@@ -1,7 +1,7 @@
 const PHONE_PATTERN = /^0[0-9]{8,9}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.com$/i;
 const NAME_PATTERN = /^[\p{Letter}\p{Mark}]+(?:[ '\-][\p{Letter}\p{Mark}]+)*$/u;
-const MIN_PASSWORD_LENGTH = 12;
+const MIN_PASSWORD_LENGTH = 6;
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";

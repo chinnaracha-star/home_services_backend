@@ -93,10 +93,10 @@ test("user auth requires email to include @ and .com", () => {
   assert.ok(withoutAt.errors.some((error) => error.field === "email"));
 });
 
-test("user auth requires password to be at least 12 characters", () => {
+test("user auth requires password to be at least 6 characters", () => {
   const registerResult = validateUserRegister({
     ...validUserRegister,
-    password: "12345678901",
+    password: "12345",
   });
   const loginResult = validateUserLogin({
     email: "user@example.com",
