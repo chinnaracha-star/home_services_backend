@@ -45,6 +45,17 @@ try {
   const unauthAdmin = await get("/api/admin/categories");
   assert.equal(unauthAdmin.response.status, 401);
 
+  const unauthPasswordChange = await fetch(`${baseUrl}/api/users/me/password`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      currentPassword: "userPassword123!",
+      newPassword: "newPassword123!",
+      confirmNewPassword: "newPassword123!",
+    }),
+  });
+  assert.equal(unauthPasswordChange.status, 401);
+
   // 4. User register validation (does not change old /auth/register)
   const invalidUserRegister = await post("/auth/user/register", {
     fullName: "สมชาย",
@@ -72,6 +83,48 @@ try {
   });
   assert.equal(shortPasswordUserLogin.response.status, 400);
   assert.ok(shortPasswordUserLogin.body.errors.some((error) => error.field === "password"));
+
+  const invalidTechnicianLogin = await post("/auth/technician/login", {
+    email: "invalid-email",
+  });
+  assert.equal(invalidTechnicianLogin.response.status, 400);
+  assert.equal(invalidTechnicianLogin.body.code, "VALIDATION_ERROR");
+
+  const userOnTechnicianLogin = await post("/auth/technician/login", {
+    email: "user@user.com",
+    password: "userPassword123!",
+  });
+  assert.notEqual(userOnTechnicianLogin.response.status, 200);
+  if (userOnTechnicianLogin.response.status === 403) {
+    assert.equal(userOnTechnicianLogin.body.code, "NOT_TECHNICIAN");
+  }
+
+  const technicianLogin = await post("/auth/technician/login", {
+    email: "technician@example.com",
+    password: "technicianPassword123!",
+  });
+  assert.equal(technicianLogin.response.status, 200);
+  assert.equal(technicianLogin.body.data.user.role, "TECHNICIAN");
+  assert.ok(technicianLogin.body.data.technician.technicianId);
+  assert.ok(technicianLogin.body.data.session.accessToken);
+
+  const invalidForgotPassword = await post("/auth/forgot-password", {
+    email: "not-an-email",
+  });
+  assert.equal(invalidForgotPassword.response.status, 400);
+  assert.equal(invalidForgotPassword.body.code, "VALIDATION_ERROR");
+
+  const unauthResetPassword = await post("/auth/reset-password", {
+    newPassword: "newPassword123!",
+    confirmNewPassword: "newPassword123!",
+  });
+  assert.equal(unauthResetPassword.response.status, 401);
+
+  const shortResetPassword = await post("/auth/reset-password", {
+    newPassword: "short",
+    confirmNewPassword: "short",
+  });
+  assert.equal(shortResetPassword.response.status, 400);
 
   console.log("Auth API basic tests passed!");
 } finally {

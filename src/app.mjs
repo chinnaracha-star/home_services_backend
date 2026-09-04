@@ -8,10 +8,23 @@ import { categoryRouter } from "./routes/category.route.mjs";
 import { serviceRouter } from "./routes/service.route.mjs";
 import adminCategoryRouter from "./routes/admin.category.mjs";
 import adminServiceRouter from "./routes/admin.service.mjs";
+import adminPromotionRouter from "./routes/admin.promotion.mjs";
 import authRouter from "./routes/auth.route.mjs";
 import { userAuthRouter } from "./routes/user-auth.route.mjs";
+import { technicianAuthRouter } from "./routes/technician-auth.route.mjs";
+import { technicianRouter } from "./routes/technician.route.mjs";
+import { reviewRouter } from "./routes/review.route.mjs";
+import addressRouter from "./routes/address.routes.mjs";
+import paymentRouter from "./routes/payment.route.mjs";
+import promotionRouter from "./routes/promotion.routes.mjs";
+import orderRouter from "./routes/order.route.mjs";
+import { chatbotRouter } from "./routes/chatbot.route.mjs";
 
 export const app = express();
+
+if (env.trustProxyHops > 0) {
+  app.set("trust proxy", env.trustProxyHops);
+}
 
 app.use(
   cors({
@@ -22,16 +35,33 @@ app.use(
 app.use(express.json());
 
 app.use("/health", healthRouter);
-app.use("/api/users", userRouter);
-app.use("/user", userRouter);
-app.use("/api/categories", categoryRouter);
-app.use("/api/services", serviceRouter);
-app.use("/api/admin/categories", adminCategoryRouter);
-app.use("/api/admin/services", adminServiceRouter);
+
 app.use("/auth/user", userAuthRouter);
 app.use("/api/auth/user", userAuthRouter);
+app.use("/auth/technician", technicianAuthRouter);
+app.use("/api/auth/technician", technicianAuthRouter);
 app.use("/auth", authRouter);
 app.use("/api/auth", authRouter);
+
+app.use("/api/categories", categoryRouter);
+app.use("/api/services", serviceRouter);
+app.use("/api/promotions", promotionRouter);
+app.use("/api", addressRouter);
+app.use("/api/payments", paymentRouter);
+app.use("/api/orders", orderRouter);
+app.use("/api/reviews", reviewRouter);
+app.use("/api/chat", chatbotRouter);
+
+app.use("/api/users", userRouter);
+app.use("/user", userRouter);
+
+app.use("/api/technician", technicianRouter);
+app.use("/api/technicians", technicianRouter);
+
+app.use("/api/admin/categories", adminCategoryRouter);
+app.use("/api/admin/services", adminServiceRouter);
+app.use("/api/admin/promotions", adminPromotionRouter);
+app.use("/api/admin/promotion", adminPromotionRouter);
 
 app.use((error, _req, res, _next) => {
   if (error?.code === "LIMIT_FILE_SIZE") {

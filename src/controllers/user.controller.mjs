@@ -1,11 +1,41 @@
+import { createClient } from "@supabase/supabase-js";
+import { env } from "../configs/env.mjs";
 import {
+  findUserByEmail,
   findUserById,
   updateUserAvatar,
   updateUserProfile,
 } from "../repositories/user.repository.mjs";
 import { uploadAvatar } from "../services/avatar.service.mjs";
 import { HttpError } from "../utils/http-error.mjs";
-import { validateUpdateProfile } from "../validators/user.validator.mjs";
+import {
+  validateChangePassword,
+  validateUpdateProfile,
+} from "../validators/user.validator.mjs";
+import { createRequestAuthClient } from "../configs/supabase.mjs";
+
+function createUserAuthClient(accessToken) {
+  return createClient(env.supabaseUrl, env.supabaseAnonKey, {
+    global: {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  });
+}
+
+async function syncAuthEmail(req, nextEmail) {
+  if (!req.accessToken || !nextEmail) return;
+
+  const userClient = createUserAuthClient(req.accessToken);
+  const { error } = await userClient.auth.updateUser({ email: nextEmail });
+
+  if (error) {
+    throw new HttpError(
+      400,
+      "EMAIL_UPDATE_FAILED",
+      error.message || "ไม่สามารถอัปเดตอีเมลสำหรับเข้าสู่ระบบได้",
+    );
+  }
+}
 
 export async function getMyProfile(req, res, next) {
   try {
@@ -42,6 +72,24 @@ export async function updateMyProfile(req, res, next) {
       return;
     }
 
+    const currentUser = await findUserById(req.user.id);
+    if (!currentUser) {
+      res.status(404).json({
+        message: "ไม่พบข้อมูลผู้ใช้",
+        code: "USER_NOT_FOUND",
+        errors: [],
+      });
+      return;
+    }
+
+    if (value.email && value.email !== String(currentUser.email || "").toLowerCase()) {
+      const existing = await findUserByEmail(value.email);
+      if (existing && String(existing.id) !== String(req.user.id)) {
+        throw new HttpError(409, "EMAIL_TAKEN", "อีเมลนี้ถูกใช้งานแล้ว");
+      }
+      await syncAuthEmail(req, value.email);
+    }
+
     const user = await updateUserProfile(req.user.id, value);
 
     if (!user) {
@@ -56,6 +104,83 @@ export async function updateMyProfile(req, res, next) {
     res.status(200).json({
       data: user,
       message: "อัปเดตโปรไฟล์สำเร็จ",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function changeMyPassword(req, res, next) {
+  try {
+    const { errors, value } = validateChangePassword(req.body);
+
+    if (errors.length > 0) {
+      res.status(400).json({
+        message: "ข้อมูลรหัสผ่านไม่ถูกต้อง",
+        code: "VALIDATION_ERROR",
+        errors,
+      });
+      return;
+    }
+
+    if (!req.accessToken || !req.authUserId) {
+      throw new HttpError(
+        401,
+        "AUTH_TOKEN_REQUIRED",
+        "กรุณาเข้าสู่ระบบก่อนเปลี่ยนรหัสผ่าน",
+      );
+    }
+
+    const authClient = createRequestAuthClient();
+    const {
+      data: { user: tokenUser },
+      error: tokenError,
+    } = await authClient.auth.getUser(req.accessToken);
+
+    if (tokenError || !tokenUser?.email || tokenUser.id !== req.authUserId) {
+      throw new HttpError(
+        401,
+        "AUTH_TOKEN_REQUIRED",
+        "กรุณาเข้าสู่ระบบก่อนเปลี่ยนรหัสผ่าน",
+      );
+    }
+
+    const { data: signInData, error: currentPasswordError } =
+      await authClient.auth.signInWithPassword({
+        email: tokenUser.email,
+        password: value.currentPassword,
+      });
+
+    if (
+      currentPasswordError ||
+      !signInData?.session ||
+      signInData.user?.id !== tokenUser.id
+    ) {
+      throw new HttpError(
+        400,
+        "CURRENT_PASSWORD_INVALID",
+        "รหัสผ่านปัจจุบันไม่ถูกต้อง",
+        [{ field: "currentPassword", message: "รหัสผ่านปัจจุบันไม่ถูกต้อง" }],
+      );
+    }
+
+    const { error: updateError } = await authClient.auth.updateUser({
+      password: value.newPassword,
+    });
+
+    await authClient.auth.signOut({ scope: "local" }).catch(() => undefined);
+
+    if (updateError) {
+      throw new HttpError(
+        400,
+        "PASSWORD_UPDATE_FAILED",
+        updateError.message || "ไม่สามารถเปลี่ยนรหัสผ่านได้",
+      );
+    }
+
+    res.status(200).json({
+      data: null,
+      message: "เปลี่ยนรหัสผ่านสำเร็จ",
     });
   } catch (error) {
     next(error);
