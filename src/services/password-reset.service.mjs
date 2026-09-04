@@ -1,10 +1,7 @@
 import { env } from "../configs/env.mjs";
 import { createRequestAuthClient, supabase } from "../configs/supabase.mjs";
 import { HttpError } from "../utils/http-error.mjs";
-
-function clientOrigin() {
-  return String(env.clientOrigin || "http://localhost:3000").replace(/\/$/, "");
-}
+import { buildPasswordResetRedirectUrl } from "../utils/password-reset-redirect.mjs";
 
 function readAccessToken(req) {
   const authHeader = req.headers.authorization;
@@ -26,7 +23,11 @@ function readRefreshToken(req, bodyToken) {
 
 export async function requestPasswordResetEmail(email) {
   await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${clientOrigin()}/reset-password`,
+    redirectTo: buildPasswordResetRedirectUrl({
+      redirectUrl: env.passwordResetRedirectUrl,
+      clientOrigin: env.clientOrigin,
+      resetPath: env.passwordResetPath,
+    }),
   });
 }
 
