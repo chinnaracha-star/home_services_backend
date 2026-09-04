@@ -8,12 +8,18 @@ for (const key of requiredEnv) {
   }
 }
 
+function stripTrailingSlash(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
 export const env = {
   databaseUrl: process.env.DATABASE_URL,
-  supabaseUrl: process.env.SUPABASE_URL,
+  supabaseUrl: stripTrailingSlash(process.env.SUPABASE_URL),
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
   port: Number(process.env.PORT) || 3001,
-  clientOrigin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
+  clientOrigin: stripTrailingSlash(process.env.CLIENT_ORIGIN) || "http://localhost:3000",
+  passwordResetRedirectUrl: stripTrailingSlash(process.env.PASSWORD_RESET_REDIRECT_URL),
+  passwordResetPath: process.env.PASSWORD_RESET_PATH || "/reset-password",
   openRouterApiKey: process.env.OPENROUTER_API_KEY || "",
   openRouterModel: process.env.OPENROUTER_MODEL || "",
   openRouterFallbackModels: (process.env.OPENROUTER_FALLBACK_MODELS || "")
