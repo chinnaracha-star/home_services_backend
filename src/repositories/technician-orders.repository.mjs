@@ -26,7 +26,8 @@ const JOB_COLUMNS = `
   services.service_name AS "serviceName",
   categories.name AS "categoryName",
   COALESCE(users.full_name, CONCAT_WS(' ', users.first_name, users.last_name), users.email) AS "customerName",
-  users.phone AS "customerPhone"
+  users.phone AS "customerPhone",
+  NULLIF(BTRIM(orders.additional_info), '') AS notes
 `;
 
 function distanceKmSql(latParam, lngParam) {
@@ -41,6 +42,12 @@ function distanceKmSql(latParam, lngParam) {
       )
     )
   `;
+}
+
+function normalizeNotes(value) {
+  const text = String(value ?? "").trim();
+  if (!text || text === "-" || text === "ไม่มี") return null;
+  return text;
 }
 
 function toJob(row, items = []) {
@@ -66,6 +73,7 @@ function toJob(row, items = []) {
     categoryName: row.categoryName ?? "",
     customerName: row.customerName ?? null,
     customerPhone: row.customerPhone ?? null,
+    notes: normalizeNotes(row.notes),
     items,
   };
 }
@@ -79,12 +87,14 @@ async function loadItemsByOrderIds(orderIds) {
         order_item.order_id::text AS "orderId",
         order_item.item_id::text AS "itemId",
         COALESCE(order_item.option_id, 0)::text AS "optionId",
-        COALESCE(service_options.option_name, 'รายการบริการ') AS "optionName",
+        COALESCE(service_options.option_name, services.service_name, 'รายการบริการ') AS "optionName",
         order_item.quantity::int AS quantity,
         order_item.unit_price::float8 AS "unitPrice",
-        COALESCE(service_options.unit, 'ครั้ง') AS unit
+        COALESCE(service_options.unit, 'เครื่อง') AS unit
       FROM order_item
       LEFT JOIN service_options ON service_options.option_id = order_item.option_id
+      LEFT JOIN orders ON orders.order_id = order_item.order_id
+      LEFT JOIN services ON services.service_id = orders.service_id
       WHERE order_item.order_id = ANY($1::bigint[])
       ORDER BY order_item.item_id ASC
     `,
@@ -93,7 +103,8 @@ async function loadItemsByOrderIds(orderIds) {
 
   const itemsByOrderId = new Map();
   for (const row of result.rows) {
-    const list = itemsByOrderId.get(row.orderId) ?? [];
+    const orderId = String(row.orderId);
+    const list = itemsByOrderId.get(orderId) ?? [];
     list.push({
       itemId: row.itemId,
       optionId: row.optionId,
@@ -102,7 +113,7 @@ async function loadItemsByOrderIds(orderIds) {
       unitPrice: row.unitPrice,
       unit: row.unit,
     });
-    itemsByOrderId.set(row.orderId, list);
+    itemsByOrderId.set(orderId, list);
   }
   return itemsByOrderId;
 }
@@ -159,7 +170,8 @@ export async function findAvailableRequests({
         services.service_name AS "serviceName",
         categories.name AS "categoryName",
         COALESCE(users.full_name, CONCAT_WS(' ', users.first_name, users.last_name), users.email) AS "customerName",
-        users.phone AS "customerPhone"
+        users.phone AS "customerPhone",
+        NULLIF(BTRIM(orders.additional_info), '') AS notes
       FROM orders
       JOIN services ON services.service_id = orders.service_id
       LEFT JOIN categories ON categories.category_id = services.category_id
