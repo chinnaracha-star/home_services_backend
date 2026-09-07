@@ -197,7 +197,7 @@ export async function findAvailableRequests({
             AND declined_job.status = 'DECLINED'
         )
         ${extra.join("\n")}
-      ORDER BY orders.scheduled_at ASC NULLS LAST, orders.order_id ASC
+      ORDER BY orders.scheduled_at DESC NULLS LAST, orders.order_id DESC
     `,
     params,
   );
