@@ -11,7 +11,7 @@
     "db:create-payments": "node src/scripts/create-payments-table.mjs",
     "db:seed-technician": "node src/scripts/seed-technician.mjs",
     "db:fix-orders": "node src/scripts/add-orders-columns.mjs",
-    "test": "vitest"
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
