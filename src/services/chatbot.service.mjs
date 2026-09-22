@@ -20,6 +20,7 @@ import {
   isClearlyOutOfScope,
   isThanks,
 } from "../utils/chatbot-scope.mjs";
+import { isBroadServiceListRequest } from "../utils/chatbot-search.mjs";
 import { HttpError } from "../utils/http-error.mjs";
 import { requestOpenRouter } from "./openrouter.service.mjs";
 
@@ -176,7 +177,14 @@ export async function sendChatMessage({ message, requestId, conversationId, hist
   }
 
   const safeHistory = modelHistory(conversationHistory, Boolean(user));
-  const classification = await classify(message, safeHistory);
+  const classification = isBroadServiceListRequest(message)
+    ? {
+        scope: "in_scope",
+        intent: "service_search",
+        language: detectedLanguage,
+        searchTerms: [],
+      }
+    : await classify(message, safeHistory);
   const language = classification.language || detectedLanguage;
   if (classification.scope === "out_of_scope") {
     const reply = OUT_OF_SCOPE_MESSAGES[language];

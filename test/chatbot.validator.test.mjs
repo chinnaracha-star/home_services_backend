@@ -8,6 +8,10 @@ import {
   isClearlyOutOfScope,
   isThanks,
 } from "../src/utils/chatbot-scope.mjs";
+import {
+  isBroadServiceListRequest,
+  normalizeChatbotSearchTerms,
+} from "../src/utils/chatbot-search.mjs";
 import { BOOKING_ACTION_MESSAGES, SMALL_TALK_MESSAGES } from "../src/constants/chatbot.constants.mjs";
 
 test("chatbot request trims valid input and limits client history", () => {
@@ -60,6 +64,20 @@ test("booking action guard distinguishes actions from booking guidance", () => {
   assert.equal(isBookingActionRequest("ช่วยยกเลิกออเดอร์แทนฉัน"), true);
   assert.equal(isBookingActionRequest("จองบริการอย่างไร"), false);
   assert.equal(isBookingActionRequest("Please book air-con cleaning for me"), true);
+});
+
+test("removes generic list words while preserving a specific service term", () => {
+  assert.deepEqual(normalizeChatbotSearchTerms(["บริการ", "ล้างแอร์"]), ["ล้างแอร์"]);
+  assert.deepEqual(normalizeChatbotSearchTerms(["รายการบริการ"]), []);
+  assert.deepEqual(normalizeChatbotSearchTerms(["what services do you offer"]), []);
+  assert.deepEqual(normalizeChatbotSearchTerms(["services"]), []);
+});
+
+test("recognizes broad service-list requests before classification", () => {
+  assert.equal(isBroadServiceListRequest("ขอรายการบริการ"), true);
+  assert.equal(isBroadServiceListRequest("มีบริการอะไรบ้าง"), true);
+  assert.equal(isBroadServiceListRequest("What services do you offer?"), true);
+  assert.equal(isBroadServiceListRequest("ล้างแอร์ราคาเท่าไหร่"), false);
 });
 
 test("small-talk guards recognize greetings and thanks without matching service questions", () => {

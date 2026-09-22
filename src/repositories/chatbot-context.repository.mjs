@@ -1,10 +1,8 @@
 import { query } from "../configs/db.mjs";
+import { normalizeChatbotSearchTerms } from "../utils/chatbot-search.mjs";
 
 export async function searchChatbotServices(searchTerms, locale = "th") {
-  const terms = searchTerms
-    .map((term) => String(term).trim())
-    .filter(Boolean)
-    .slice(0, 5);
+  const terms = normalizeChatbotSearchTerms(searchTerms);
   const result = await query(
     `SELECT
        service.service_id::text AS id,
