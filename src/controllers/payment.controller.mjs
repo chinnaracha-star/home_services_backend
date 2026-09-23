@@ -20,6 +20,14 @@ export async function createPaymentIntent(req,res) {
   try {
     const { amount } = req.body;
     const userId = getAuthenticatedUserId(req);
+    const idempotencyKey = req.get("Idempotency-Key")?.trim();
+
+    if (!idempotencyKey || !/^[A-Za-z0-9._:-]{16,100}$/.test(idempotencyKey)) {
+      return res.status(400).json({
+        error: "Idempotency-Key header is required",
+        code: "INVALID_IDEMPOTENCY_KEY",
+      });
+    }
 
     // NEVER trust the amount coming from the frontend
     // in a real application.
@@ -31,7 +39,7 @@ export async function createPaymentIntent(req,res) {
       });
     }
 
-    const paymentIntent = await createToStripe(amount, userId);
+    const paymentIntent = await createToStripe(amount, userId, idempotencyKey);
 
     res.json({
       clientSecret: paymentIntent.client_secret,

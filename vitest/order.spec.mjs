@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { checkoutService } from "../src/services/order.service.mjs";
+import { checkout as checkoutRepository } from "../src/repositories/order.repository.mjs";
 import { info } from "node:console";
 import { runTransaction } from "../src/configs/db.mjs";
 
@@ -15,6 +16,39 @@ vi.mock("../src/configs/db.mjs", () => ({
 }));
 
 describe("checkoutService", () => {
+  const validPromptPayCheckout = {
+    serviceId: 2,
+    totalAmount: 1000,
+    discount: 0,
+    serviceDate: "2026-09-10",
+    serviceTime: "10:00:00",
+    address: "58/28 Chaeng Watthana Road",
+    province: "Nonthaburi",
+    district: "Pak Kret",
+    subdistrict: "Bang Talat",
+    latitude: 13.901594,
+    longitude: 100.53134,
+    paymentMethod: "promptpay",
+    paymentStatus: "pending",
+    items: [{ optionId: 3, quantity: 1, unitPrice: 1000 }],
+  };
+
+  it("requires an idempotency key for a valid checkout", async () => {
+    await expect(checkoutService(validPromptPayCheckout, 1)).rejects.toMatchObject({
+      statusCode: 400,
+      code: "INVALID_IDEMPOTENCY_KEY",
+    });
+  });
+
+  it("passes the idempotency key to the checkout repository", async () => {
+    checkoutRepository.mockResolvedValue({ order: { order_id: 1 }, payment: {}, replayed: false });
+
+    await checkoutService(validPromptPayCheckout, 1, "checkout-test-key-0001");
+
+    expect(checkoutRepository).toHaveBeenCalledWith(
+      expect.objectContaining({ checkoutRequestId: "checkout-test-key-0001" }),
+    );
+  });
   
   it("totalAmount less than or equal to zero", async () => {
     const checkoutData = {

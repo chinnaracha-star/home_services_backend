@@ -8,8 +8,48 @@ function checkoutError(stage, message, { statusCode = 500, code = "CHECKOUT_FAIL
     return error;
 }
 
+async function findExistingCheckout(client, { userId, checkoutRequestId, paymentIntentId }) {
+    const result = await client.query(
+        `SELECT orders.*
+         FROM orders
+         LEFT JOIN payment ON payment.order_id = orders.order_id
+         WHERE orders.user_id = $1
+           AND (
+             orders.checkout_request_id = $2
+             OR ($3::text IS NOT NULL AND payment.payment_intent_id = $3)
+           )
+         ORDER BY orders.order_id ASC
+         LIMIT 1`,
+        [userId, checkoutRequestId, paymentIntentId],
+    );
+    const order = result.rows[0];
+    if (!order) return null;
+
+    const paymentResult = await client.query(
+        `SELECT * FROM payment WHERE order_id = $1 ORDER BY payment_id DESC LIMIT 1`,
+        [order.order_id],
+    );
+    return { order, payment: paymentResult.rows[0] || null, replayed: true };
+}
+
 export async function checkout(checkoutData) {
     return runTransaction(async (client) => {
+        if (checkoutData.checkoutRequestId) {
+            await client.query(
+                `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
+                [`checkout:${checkoutData.userId}:${checkoutData.checkoutRequestId}`],
+            );
+            if (checkoutData.paymentIntentId) {
+                await client.query(
+                    `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
+                    [`payment:${checkoutData.paymentIntentId}`],
+                );
+            }
+
+            const existingCheckout = await findExistingCheckout(client, checkoutData);
+            if (existingCheckout) return existingCheckout;
+        }
+
         let promotion = null;
         const promotionCode = typeof checkoutData.promotionCode === "string" ? checkoutData.promotionCode.trim() : checkoutData.promotionCode;
 
@@ -42,13 +82,13 @@ export async function checkout(checkoutData) {
         try {
             const result = await client.query(
                 `INSERT INTO orders
-                    (user_id, service_id, status, total_price, scheduled_date, scheduled_time, address, province, district, subdistrict, additional_info, promotion_id, discount, service_latitude, service_longitude, scheduled_at)
-                 VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                    (user_id, service_id, status, total_price, scheduled_date, scheduled_time, address, province, district, subdistrict, additional_info, promotion_id, discount, service_latitude, service_longitude, scheduled_at, checkout_request_id)
+                 VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                  RETURNING *`,
                 [checkoutData.userId, checkoutData.serviceId, checkoutData.totalAmount, checkoutData.serviceDate,
                     checkoutData.serviceTime, checkoutData.address, checkoutData.province, checkoutData.district,
                     checkoutData.subdistrict, checkoutData.information, promotion?.promotion_id || null, checkoutData.discount,
-                    checkoutData.latitude, checkoutData.longitude, checkoutData.scheduledAt],
+                    checkoutData.latitude, checkoutData.longitude, checkoutData.scheduledAt, checkoutData.checkoutRequestId],
             );
             order = result.rows[0];
         } catch (error) {
@@ -72,10 +112,11 @@ export async function checkout(checkoutData) {
         let payment;
         try {
             const result = await client.query(
-                `INSERT INTO payment (order_id, payment_method, payment_status, amount)
-                 VALUES ($1, $2, $3, $4)
+                `INSERT INTO payment (order_id, payment_method, payment_status, amount, payment_intent_id)
+                 VALUES ($1, $2, $3, $4, $5)
                  RETURNING *`,
-                [order.order_id, checkoutData.paymentMethod, checkoutData.paymentStatus, checkoutData.totalAmount],
+                [order.order_id, checkoutData.paymentMethod, checkoutData.paymentStatus, checkoutData.totalAmount,
+                    checkoutData.paymentIntentId],
             );
             payment = result.rows[0];
         } catch (error) {
@@ -96,7 +137,7 @@ export async function checkout(checkoutData) {
             }
         }
 
-        return { order, payment };
+        return { order, payment, replayed: false };
     });
 }
 
@@ -187,11 +228,28 @@ export async function getUserOrdersRepository(userId) {
         orders.created_at AS "createdAt"
       FROM orders
       JOIN services ON services.service_id = orders.service_id
-      LEFT JOIN payment ON payment.order_id = orders.order_id
-      LEFT JOIN order_assignment oa ON oa.order_id = orders.order_id AND oa.status IN ('ACCEPTED', 'IN_PROGRESS', 'COMPLETED')
+      LEFT JOIN LATERAL (
+        SELECT p.* FROM payment p
+        WHERE p.order_id = orders.order_id
+        ORDER BY p.payment_id DESC
+        LIMIT 1
+      ) payment ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT assignment.* FROM order_assignment assignment
+        WHERE assignment.order_id = orders.order_id
+          AND assignment.status IN ('ACCEPTED', 'IN_PROGRESS', 'COMPLETED')
+        ORDER BY COALESCE(assignment.completed_at, assignment.assigned_at) DESC NULLS LAST,
+                 assignment.assignment_id DESC
+        LIMIT 1
+      ) oa ON TRUE
       LEFT JOIN technicians t ON t.technician_id = oa.technician_id
       LEFT JOIN users tu ON tu.user_id = t.user_id
-      LEFT JOIN reviews ON (reviews.order_id = orders.order_id OR reviews.order_code = orders.order_code)
+      LEFT JOIN LATERAL (
+        SELECT review.* FROM reviews review
+        WHERE review.order_id = orders.order_id OR review.order_code = orders.order_code
+        ORDER BY review.created_at DESC, review.review_id DESC
+        LIMIT 1
+      ) reviews ON TRUE
       WHERE orders.user_id = $1
       ORDER BY orders.created_at DESC, orders.order_id DESC
     `;
@@ -350,11 +408,28 @@ export async function getOrderByIdRepository(orderIdOrCode, userId) {
         orders.created_at AS "createdAt"
       FROM orders
       JOIN services ON services.service_id = orders.service_id
-      LEFT JOIN payment ON payment.order_id = orders.order_id
-      LEFT JOIN order_assignment oa ON oa.order_id = orders.order_id AND oa.status IN ('ACCEPTED', 'IN_PROGRESS', 'COMPLETED')
+      LEFT JOIN LATERAL (
+        SELECT p.* FROM payment p
+        WHERE p.order_id = orders.order_id
+        ORDER BY p.payment_id DESC
+        LIMIT 1
+      ) payment ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT assignment.* FROM order_assignment assignment
+        WHERE assignment.order_id = orders.order_id
+          AND assignment.status IN ('ACCEPTED', 'IN_PROGRESS', 'COMPLETED')
+        ORDER BY COALESCE(assignment.completed_at, assignment.assigned_at) DESC NULLS LAST,
+                 assignment.assignment_id DESC
+        LIMIT 1
+      ) oa ON TRUE
       LEFT JOIN technicians t ON t.technician_id = oa.technician_id
       LEFT JOIN users tu ON tu.user_id = t.user_id
-      LEFT JOIN reviews ON (reviews.order_id = orders.order_id OR reviews.order_code = orders.order_code)
+      LEFT JOIN LATERAL (
+        SELECT review.* FROM reviews review
+        WHERE review.order_id = orders.order_id OR review.order_code = orders.order_code
+        ORDER BY review.created_at DESC, review.review_id DESC
+        LIMIT 1
+      ) reviews ON TRUE
       WHERE ${whereClause}${userFilter}
       LIMIT 1
     `;
