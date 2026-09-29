@@ -11,6 +11,7 @@ import {
   findDisplayHistory,
   getOrCreateConversation,
   saveConversationExchange,
+  withServiceAvailability,
 } from "../repositories/ai-chat.repository.mjs";
 import { searchChatbotServices } from "../repositories/chatbot-context.repository.mjs";
 import {
@@ -33,6 +34,48 @@ const VALID_INTENTS = new Set([
   "general_homeservice_question",
   "unrelated",
 ]);
+
+const serviceAnswerFormat = {
+  type: "json_schema",
+  json_schema: {
+    name: "homeservice_answer",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        message: { type: "string" },
+        serviceIds: { type: "array", items: { type: "string" }, maxItems: 8 },
+      },
+      required: ["message", "serviceIds"],
+      additionalProperties: false,
+    },
+  },
+};
+
+export function parseServiceAnswer(content, serviceContext) {
+  let answer;
+  try {
+    answer = JSON.parse(content);
+  } catch {
+    throw new Error("Invalid service answer JSON");
+  }
+  if (typeof answer.message !== "string" || !answer.message.trim() ||
+      !Array.isArray(answer.serviceIds) || answer.serviceIds.length > 8 ||
+      answer.serviceIds.some((id) => typeof id !== "string")) {
+    throw new Error("Invalid service answer");
+  }
+  const servicesById = new Map(serviceContext.map((service) => [service.id, service]));
+  const serviceLinks = [...new Set(answer.serviceIds)]
+    .map((id) => servicesById.get(id))
+    .filter((service) => service && answer.message.includes(service.name))
+    .map((service) => ({
+      id: service.id,
+      name: service.name,
+      href: `/service-details/${service.id}`,
+      available: true,
+    }));
+  return { message: answer.message.trim(), serviceLinks };
+}
 
 const classificationFormat = {
   type: "json_schema",
@@ -116,17 +159,23 @@ async function classify(message, history) {
   });
 }
 
-async function persistReply(user, conversationId, requestId, message, reply) {
-  if (!user) return { conversationId: null, message: reply };
+async function persistReply(user, conversationId, requestId, message, reply, serviceLinks = []) {
+  if (!user) return { conversationId: null, message: reply, serviceLinks };
   const conversation = await getOrCreateConversation(user.id, conversationId);
   const messages = await saveConversationExchange(
     conversation.conversationId,
     requestId,
     message,
     reply,
+    serviceLinks,
   );
-  const persistedReply = messages.find((item) => item.role === "assistant")?.content || reply;
-  return { conversationId: conversation.conversationId, message: persistedReply };
+  const persistedReply = messages.find((item) => item.role === "assistant");
+  const availableLinks = await withServiceAvailability(persistedReply?.serviceLinks || serviceLinks);
+  return {
+    conversationId: conversation.conversationId,
+    message: persistedReply?.content || reply,
+    serviceLinks: availableLinks,
+  };
 }
 
 export async function sendChatMessage({ message, requestId, conversationId, history, user }) {
@@ -150,7 +199,7 @@ export async function sendChatMessage({ message, requestId, conversationId, hist
       message,
       reply,
     );
-    return { message: persisted.message, conversationId: persisted.conversationId };
+    return persisted;
   }
   if (isBookingActionRequest(message)) {
     const reply = BOOKING_ACTION_MESSAGES[detectedLanguage];
@@ -161,7 +210,7 @@ export async function sendChatMessage({ message, requestId, conversationId, hist
       message,
       reply,
     );
-    return { message: persisted.message, conversationId: persisted.conversationId };
+    return persisted;
   }
   if (isClearlyOutOfScope(message)) {
     const reply = OUT_OF_SCOPE_MESSAGES[detectedLanguage];
@@ -172,7 +221,7 @@ export async function sendChatMessage({ message, requestId, conversationId, hist
       message,
       reply,
     );
-    return { message: persisted.message, conversationId: persisted.conversationId };
+    return persisted;
   }
 
   const safeHistory = modelHistory(conversationHistory, Boolean(user));
@@ -187,7 +236,7 @@ export async function sendChatMessage({ message, requestId, conversationId, hist
       message,
       reply,
     );
-    return { message: persisted.message, conversationId: persisted.conversationId };
+    return persisted;
   }
 
   if (classification.intent === "booking_action") {
@@ -199,7 +248,7 @@ export async function sendChatMessage({ message, requestId, conversationId, hist
       message,
       reply,
     );
-    return { message: persisted.message, conversationId: persisted.conversationId };
+    return persisted;
   }
 
   let serviceContext = [];
@@ -214,32 +263,54 @@ export async function sendChatMessage({ message, requestId, conversationId, hist
         message,
         reply,
       );
-      return { message: persisted.message, conversationId: persisted.conversationId };
+      return persisted;
     }
   }
 
-  const reply = await requestOpenRouter({
+  const answerPrompt = buildAnswerPrompt(language, serviceContext);
+  const serviceLinkInstructions = serviceContext.length
+    ? `\nReturn JSON with message and serviceIds. serviceIds must contain only IDs from
+SERVICE_CONTEXT for every specific service recommended by exact name in message.
+Use [] when no specific service is recommended. Never place URLs in message.`
+    : "";
+  const answer = await requestOpenRouter({
     messages: [
-      { role: "system", content: buildAnswerPrompt(language, serviceContext) },
+      { role: "system", content: answerPrompt + serviceLinkInstructions },
       ...safeHistory,
       { role: "user", content: message },
     ],
+    ...(serviceContext.length ? {
+      responseFormat: serviceAnswerFormat,
+      validate: (content) => parseServiceAnswer(content, serviceContext),
+    } : {}),
   });
+  const reply = typeof answer === "string" ? answer : answer.message;
+  const serviceLinks = typeof answer === "string" ? [] : answer.serviceLinks;
   const persisted = await persistReply(
     user,
     storedConversation?.conversationId,
     requestId,
     message,
     reply,
+    serviceLinks,
   );
-  return { message: persisted.message, conversationId: persisted.conversationId };
+  return persisted;
 }
 
 export async function getChatHistory(user) {
   if (!user) throw new HttpError(401, "UNAUTHORIZED", "Authentication is required");
   const conversation = await getOrCreateConversation(user.id);
   const messages = await findDisplayHistory(conversation.conversationId);
-  return { conversationId: conversation.conversationId, messages };
+  const links = messages.flatMap((item) => item.serviceLinks || []);
+  const availableLinks = await withServiceAvailability(links);
+  const availability = new Map(availableLinks.map((link) => [link.id, link.available]));
+  return { conversationId: conversation.conversationId, messages: messages.map((item) => ({
+    ...item,
+    serviceLinks: (item.serviceLinks || []).map((link) => ({
+      ...link,
+      available: availability.get(link.id) ?? false,
+    })),
+  })) };
 }
 
 export async function clearChatHistory(user) {

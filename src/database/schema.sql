@@ -861,10 +861,12 @@ CREATE TABLE IF NOT EXISTS ai_chat_messages (
   role VARCHAR(10) NOT NULL CHECK (role IN ('user', 'assistant')),
   request_id VARCHAR(100),
   content VARCHAR(5000) NOT NULL CHECK (char_length(trim(content)) > 0),
+  service_links JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE ai_chat_messages ADD COLUMN IF NOT EXISTS request_id VARCHAR(100);
+ALTER TABLE ai_chat_messages ADD COLUMN IF NOT EXISTS service_links JSONB NOT NULL DEFAULT '[]'::jsonb;
 CREATE INDEX IF NOT EXISTS ai_chat_messages_conversation_created_idx
   ON ai_chat_messages (conversation_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS ai_chat_messages_created_idx
