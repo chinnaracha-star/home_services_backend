@@ -71,16 +71,19 @@ http://localhost:3001
 ### Payments
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/api/payments/intent` | ✅ Yes | Create payment intent |
+| POST | `/api/payments/intent` | ✅ Yes | Create payment intent (`Idempotency-Key` required) |
 | GET | `/api/payments/status/:paymentIntentId` | ✅ Yes | Get payment status |
 
 ### Orders
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/api/orders` | ❌ No | Create new order ⚠️ |
-| POST | `/api/orders/order-item` | ❌ No | Create order item ⚠️ |
+| GET | `/api/orders` | ✅ Yes | Get the current user's orders |
+| GET | `/api/orders/:id` | ✅ Yes | Get one order by ID or order code |
+| POST | `/api/orders/checkout` | ✅ Yes | Atomically create an order and payment (`Idempotency-Key` required) |
+| POST | `/api/orders` | ✅ Yes | Legacy order creation |
+| POST | `/api/orders/order-item` | ✅ Yes | Legacy order-item creation |
 
-> ⚠️ **Security Warning**: Order endpoints should be protected with authentication!
+Retrying checkout with the same `Idempotency-Key` returns the original order with `data.replayed: true`.
 
 ---
 

@@ -474,6 +474,11 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_code TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_latitude NUMERIC(9, 6);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_longitude NUMERIC(9, 6);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS checkout_request_id VARCHAR(100);
+
+CREATE UNIQUE INDEX IF NOT EXISTS orders_user_checkout_request_uidx
+  ON orders (user_id, checkout_request_id)
+  WHERE checkout_request_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS order_item (
   item_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -718,6 +723,7 @@ CREATE TABLE IF NOT EXISTS payments (
   order_id BIGINT NOT NULL,
   payment_method VARCHAR(100) NOT NULL,
   payment_status VARCHAR(50) NOT NULL,
+  payment_intent_id VARCHAR(255),
   amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
@@ -754,6 +760,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_scheduled_date ON orders(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
+CREATE UNIQUE INDEX IF NOT EXISTS payments_intent_id_uidx
+  ON payments(payment_intent_id)
+  WHERE payment_intent_id IS NOT NULL;
 
 -- Create updated_at trigger function if not exists
 CREATE OR REPLACE FUNCTION update_updated_at_column()

@@ -39,6 +39,16 @@ function requireText(value, field) {
     return value.trim();
 }
 
+function requireIdempotencyKey(value) {
+    if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{16,100}$/.test(value.trim())) {
+        throw new CheckoutError("validation", "Idempotency-Key header is required", {
+            statusCode: 400,
+            code: "INVALID_IDEMPOTENCY_KEY",
+        });
+    }
+    return value.trim();
+}
+
 function requireCoordinate(value, field, min, max) {
     const number = Number(value);
     if (!Number.isFinite(number) || number < min || number > max) {
@@ -78,7 +88,7 @@ async function verifyCardPayment(paymentIntentId, userId, totalAmount) {
  * Persists a completed (or pending PromptPay) checkout atomically.  A failure
  * rolls back the order, all order items, payment record, and promotion quota.
  */
-export async function checkoutService(checkoutData, authenticatedUserId) {
+export async function checkoutService(checkoutData, authenticatedUserId, idempotencyKey) {
     const userId = requirePositiveInteger(authenticatedUserId, "authenticated user ID");
     const serviceId = requirePositiveInteger(checkoutData.serviceId, "serviceId");
     const totalAmount = Number(checkoutData.totalAmount);
@@ -142,13 +152,17 @@ export async function checkoutService(checkoutData, authenticatedUserId) {
         });
     }
 
+    const checkoutRequestId = requireIdempotencyKey(idempotencyKey);
+
     return checkout({
         userId,
+        checkoutRequestId,
         serviceId,
         totalAmount,
         discount,
         paymentMethod,
         paymentStatus,
+        paymentIntentId: typeof checkoutData.paymentIntentId === "string" ? checkoutData.paymentIntentId.trim() || null : null,
         serviceDate,
         serviceTime,
         address,

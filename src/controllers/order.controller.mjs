@@ -13,10 +13,11 @@ function hasValue(value) {
 // ใช้อันนี้อันเดียว
 export async function checkoutController(req, res) {
     try {
-        const result = await checkoutService(req.body, req.user?.id);
+        const idempotencyKey = req.get("Idempotency-Key");
+        const result = await checkoutService(req.body, req.user?.id, idempotencyKey);
 
-        return res.status(201).json({
-            message: "Checkout recorded successfully",
+        return res.status(result.replayed ? 200 : 201).json({
+            message: result.replayed ? "Checkout already recorded" : "Checkout recorded successfully",
             data: result,
         });
     } catch (error) {
