@@ -53,9 +53,9 @@ export async function findConversationMessages(
 ) {
   await deleteExpiredMessages(conversationId);
   const result = await query(
-    `SELECT message_id::text AS id, role, content, created_at AS "createdAt"
+    `SELECT message_id::text AS id, role, content, service_links AS "serviceLinks", created_at AS "createdAt"
      FROM (
-       SELECT message_id, role, content, created_at
+       SELECT message_id, role, content, service_links, created_at
        FROM ai_chat_messages
        WHERE conversation_id = $1
        ORDER BY created_at DESC, message_id DESC
@@ -76,6 +76,7 @@ export async function saveConversationExchange(
   requestId,
   userMessage,
   assistantMessage,
+  serviceLinks = [],
 ) {
   return runTransaction(async (client) => {
     await deleteExpiredMessages(conversationId, client.query.bind(client));
@@ -90,7 +91,7 @@ export async function saveConversationExchange(
     );
     if (userResult.rows.length === 0) {
       const existing = await client.query(
-        `SELECT message_id::text AS id, role, content, created_at AS "createdAt"
+        `SELECT message_id::text AS id, role, content, service_links AS "serviceLinks", created_at AS "createdAt"
          FROM ai_chat_messages
          WHERE conversation_id = $1 AND request_id = $2
          ORDER BY message_id ASC`,
@@ -99,10 +100,10 @@ export async function saveConversationExchange(
       return existing.rows;
     }
     const assistantResult = await client.query(
-      `INSERT INTO ai_chat_messages (conversation_id, role, request_id, content)
-       VALUES ($1, 'assistant', $2, $3)
-       RETURNING message_id::text AS id, role, content, created_at AS "createdAt"`,
-      [conversationId, requestId, assistantMessage],
+      `INSERT INTO ai_chat_messages (conversation_id, role, request_id, content, service_links)
+       VALUES ($1, 'assistant', $2, $3, $4::jsonb)
+       RETURNING message_id::text AS id, role, content, service_links AS "serviceLinks", created_at AS "createdAt"`,
+      [conversationId, requestId, assistantMessage, JSON.stringify(serviceLinks)],
     );
     await client.query(
       `UPDATE ai_conversations SET updated_at = now() WHERE conversation_id = $1`,
@@ -110,6 +111,21 @@ export async function saveConversationExchange(
     );
     return [...userResult.rows, ...assistantResult.rows];
   });
+}
+
+export async function withServiceAvailability(serviceLinks) {
+  if (serviceLinks.length === 0) return [];
+  const ids = [...new Set(serviceLinks.map((link) => link.id))];
+  const result = await query(
+    `SELECT service.service_id::text AS id
+     FROM services service
+     JOIN categories category ON category.category_id = service.category_id
+     WHERE service.service_id::text = ANY($1::text[])
+       AND service.is_active = true AND category.is_active = true`,
+    [ids],
+  );
+  const activeIds = new Set(result.rows.map((row) => row.id));
+  return serviceLinks.map((link) => ({ ...link, available: activeIds.has(link.id) }));
 }
 
 export async function clearConversationMessages(conversationId) {
