@@ -13,7 +13,8 @@
     "db:create-payments": "node src/scripts/create-payments-table.mjs",
     "db:seed-technician": "node src/scripts/seed-technician.mjs",
     "db:fix-orders": "node src/scripts/add-orders-columns.mjs",
-    "test": "node --test && vitest run vitest/order.spec.mjs"
+    "test": "node --test && vitest run vitest",
+    "test:auth-integration": "node --test test/register-user.api.test.mjs"
   },
   "repository": {
     "type": "git",
