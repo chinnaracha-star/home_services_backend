@@ -26,6 +26,7 @@ test("protect accepts a development user id", async () => {
   let called = false;
   const protect = createProtect({
     findById: async () => ({ id: "1", email: "dev@example.com", role: "USER" }),
+    allowDevUserId: true,
   });
 
   await protect(req, responseRecorder(), () => { called = true; });

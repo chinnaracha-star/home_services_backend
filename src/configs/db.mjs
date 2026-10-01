@@ -9,6 +9,10 @@ export const pool = new Pool({
   max: 10,
 });
 
+pool.on("error", (err) => {
+  console.error("Unexpected error on idle database client:", err.message);
+});
+
 export async function query(text, params) {
   return pool.query(text, params);
 }

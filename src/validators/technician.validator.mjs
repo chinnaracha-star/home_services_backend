@@ -102,6 +102,10 @@ export function validateUpdateTechnicianSettings(body) {
 export function validateLocation(body = {}) {
   const latitude = Number(body.latitude);
   const longitude = Number(body.longitude);
+  const address =
+    body?.address === undefined || body?.address === null
+      ? undefined
+      : asText(body.address);
   const errors = [];
 
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
@@ -110,6 +114,74 @@ export function validateLocation(body = {}) {
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     errors.push({ field: "longitude", message: "longitude ต้องอยู่ระหว่าง -180 ถึง 180" });
   }
+  if (address !== undefined && address.length > 500) {
+    errors.push({ field: "address", message: "ที่อยู่ต้องไม่เกิน 500 ตัวอักษร" });
+  }
 
-  return { errors, value: { latitude, longitude } };
+  return {
+    errors,
+    value: {
+      latitude,
+      longitude,
+      ...(address !== undefined ? { address } : {}),
+    },
+  };
+}
+
+export function parsePositiveId(value) {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return id;
+}
+
+export function parseTechnicianListQuery(query = {}) {
+  const errors = [];
+  const search = asText(query.search);
+  const sort = asText(query.sort);
+  const status = asText(query.status).toUpperCase();
+  const serviceId = query.serviceId === undefined || query.serviceId === ""
+    ? undefined
+    : parsePositiveId(query.serviceId);
+
+  if (query.serviceId && serviceId === null) {
+    errors.push({ field: "serviceId", message: "serviceId ไม่ถูกต้อง" });
+  }
+
+  if (sort && !["newest", "oldest", "nearest"].includes(sort)) {
+    errors.push({ field: "sort", message: "sort ต้องเป็น newest, oldest หรือ nearest" });
+  }
+
+  if (
+    status &&
+    !["ACCEPTED", "IN_PROGRESS", "COMPLETED", "CANCELLED"].includes(status)
+  ) {
+    errors.push({ field: "status", message: "สถานะงานไม่ถูกต้อง" });
+  }
+
+  let latitude;
+  let longitude;
+  if (query.latitude !== undefined && query.latitude !== "") {
+    latitude = Number(query.latitude);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      errors.push({ field: "latitude", message: "latitude ต้องอยู่ระหว่าง -90 ถึง 90" });
+    }
+  }
+  if (query.longitude !== undefined && query.longitude !== "") {
+    longitude = Number(query.longitude);
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      errors.push({ field: "longitude", message: "longitude ต้องอยู่ระหว่าง -180 ถึง 180" });
+    }
+  }
+
+  return {
+    errors,
+    value: {
+      search: search || undefined,
+      sort: sort || undefined,
+      status: status || undefined,
+      serviceId,
+      latitude,
+      longitude,
+    },
+  };
 }

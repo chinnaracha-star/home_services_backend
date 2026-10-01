@@ -15,6 +15,12 @@ import {
   validateUpdateService,
   validateReorderServices,
 } from "../validators/admin-service.validator.mjs";
+import {
+  getServiceOptionTranslations,
+  getServiceTranslations,
+  putServiceOptionTranslation,
+  putServiceTranslation,
+} from "../controllers/admin-translation.controller.mjs";
 
 export const adminServiceRouter = express.Router();
 
@@ -23,6 +29,19 @@ adminServiceRouter.use(protect, requireAdmin);
 
 adminServiceRouter.get("/", getAdminServices);
 adminServiceRouter.patch("/reorder", validateReorderServices, handleReorderAdminServices);
+adminServiceRouter.get(
+  "/options/:optionId/translations",
+  getServiceOptionTranslations,
+);
+adminServiceRouter.put(
+  "/options/:optionId/translations/:locale",
+  putServiceOptionTranslation,
+);
+adminServiceRouter.get("/:id/translations", getServiceTranslations);
+adminServiceRouter.put(
+  "/:id/translations/:locale",
+  putServiceTranslation,
+);
 adminServiceRouter.get("/:id", validateIdParam, getAdminServiceById);
 adminServiceRouter.post("/", validateCreateService, handleCreateAdminService);
 adminServiceRouter.put("/:id", validateUpdateService, handleUpdateAdminService);

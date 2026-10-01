@@ -53,7 +53,10 @@ export async function findTechnicianSettingsByUserId(userId) {
         users.phone,
         technician.technician_id AS "technicianId",
         technician.address,
-        technician.is_available AS "isAvailable"
+        technician.is_available AS "isAvailable",
+        technician.current_latitude::float8 AS latitude,
+        technician.current_longitude::float8 AS longitude,
+        technician.location_updated_at AS "locationUpdatedAt"
       FROM users
       JOIN technicians technician ON technician.user_id = users.user_id
       WHERE users.user_id = $1
@@ -99,9 +102,9 @@ export async function findTechnicianSettingsByUserId(userId) {
       id: String(skill.id),
       name: skill.name,
     })),
-    latitude: null,
-    longitude: null,
-    locationUpdatedAt: null,
+    latitude: row.latitude ?? null,
+    longitude: row.longitude ?? null,
+    locationUpdatedAt: row.locationUpdatedAt ?? null,
   };
 }
 
@@ -172,8 +175,12 @@ export async function updateTechnicianSettings(userId, technicianId, settings) {
   return findTechnicianSettingsByUserId(userId);
 }
 
-export async function updateTechnicianLocation(userId, { latitude, longitude }) {
+export async function updateTechnicianLocation(
+  userId,
+  { latitude, longitude, address },
+) {
   try {
+    const hasAddress = address !== undefined;
     const result = await query(
       `
         UPDATE technicians
@@ -182,13 +189,17 @@ export async function updateTechnicianLocation(userId, { latitude, longitude }) 
           current_longitude = $3,
           location_updated_at = now(),
           updated_at = now()
+          ${hasAddress ? ", address = $4" : ""}
         WHERE user_id = $1
         RETURNING
           current_latitude::float8 AS latitude,
           current_longitude::float8 AS longitude,
           location_updated_at AS "locationUpdatedAt"
+          ${hasAddress ? ", address" : ""}
       `,
-      [userId, latitude, longitude],
+      hasAddress
+        ? [userId, latitude, longitude, address]
+        : [userId, latitude, longitude],
     );
     return result.rows[0] ?? null;
   } catch (error) {
@@ -197,6 +208,7 @@ export async function updateTechnicianLocation(userId, { latitude, longitude }) 
         latitude,
         longitude,
         locationUpdatedAt: new Date().toISOString(),
+        ...(address !== undefined ? { address } : {}),
       };
     }
     throw error;

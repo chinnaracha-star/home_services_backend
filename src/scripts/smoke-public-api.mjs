@@ -40,6 +40,22 @@ try {
   assert.ok(detail.body.data.serviceOptions.length > 0);
   assert.ok(detail.body.data.maxPrice >= detail.body.data.minPrice);
 
+  const englishServices = await get("/api/services?locale=en");
+  assert.equal(englishServices.response.status, 200);
+  assert.ok(Array.isArray(englishServices.body.data));
+
+  const englishCategories = await get("/api/categories?locale=en");
+  assert.equal(englishCategories.response.status, 200);
+  assert.ok(Array.isArray(englishCategories.body.data));
+
+  const englishDetail = await get(`/api/services/${serviceId}?locale=en`);
+  assert.equal(englishDetail.response.status, 200);
+  assert.ok(Array.isArray(englishDetail.body.data.serviceOptions));
+
+  const invalidLocale = await get("/api/services?locale=jp");
+  assert.equal(invalidLocale.response.status, 400);
+  assert.equal(invalidLocale.body.code, "INVALID_LOCALE");
+
   const missingService = await get("/api/services/999999999999");
   assert.equal(missingService.response.status, 404);
 

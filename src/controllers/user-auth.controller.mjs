@@ -1,5 +1,6 @@
 import { supabase } from "../configs/supabase.mjs";
 import { createUser, findUserByEmail } from "../repositories/user.repository.mjs";
+import { registerCustomer } from "../services/register-user.service.mjs";
 import {
   validateUserLogin,
   validateUserRegister,
@@ -18,50 +19,13 @@ export async function registerUser(req, res, next) {
       return;
     }
 
-    const { email, password, fullName, phone } = value;
-    const existingUser = await findUserByEmail(email);
-
-    if (existingUser) {
-      res.status(409).json({
-        message: "อีเมลนี้ถูกใช้งานแล้ว",
-        code: "EMAIL_ALREADY_EXISTS",
-        errors: [{ field: "email", message: "อีเมลนี้ถูกใช้งานแล้ว" }],
-      });
-      return;
-    }
-
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          phone,
-        },
-      },
-    });
-
-    if (authError || !authData?.user) {
-      res.status(400).json({
-        message: authError?.message || "ไม่สามารถลงทะเบียนผู้ใช้ได้",
-        code: "AUTH_REGISTRATION_FAILED",
-      });
-      return;
-    }
-
-    const createdUser = await createUser({
-      username: email.split("@")[0],
-      email: authData.user.email,
-      fullName,
-      phone,
-      role: "USER",
-    });
+    const { user, session } = await registerCustomer(value);
 
     res.status(201).json({
       message: "ลงทะเบียนสำเร็จ",
       data: {
-        user: createdUser,
-        session: authData.session,
+        user,
+        session,
       },
     });
   } catch (error) {
@@ -106,6 +70,12 @@ export async function loginUser(req, res, next) {
         fullName:
           authData.user.user_metadata?.full_name ||
           authData.user.email.split("@")[0],
+        displayName:
+          authData.user.user_metadata?.display_name ||
+          authData.user.user_metadata?.full_name ||
+          authData.user.email.split("@")[0],
+        firstName: authData.user.user_metadata?.first_name || null,
+        lastName: authData.user.user_metadata?.last_name || null,
         phone: authData.user.user_metadata?.phone || null,
         role: "USER",
       });
