@@ -9,6 +9,7 @@ import { serviceRouter } from "./routes/service.route.mjs";
 import adminCategoryRouter from "./routes/admin.category.mjs";
 import adminServiceRouter from "./routes/admin.service.mjs";
 import adminPromotionRouter from "./routes/admin.promotion.mjs";
+import adminDashboardRouter from "./routes/admin.dashboard.mjs";
 import authRouter from "./routes/auth.route.mjs";
 import { userAuthRouter } from "./routes/user-auth.route.mjs";
 import { technicianAuthRouter } from "./routes/technician-auth.route.mjs";
@@ -62,6 +63,7 @@ app.use("/api/admin/categories", adminCategoryRouter);
 app.use("/api/admin/services", adminServiceRouter);
 app.use("/api/admin/promotions", adminPromotionRouter);
 app.use("/api/admin/promotion", adminPromotionRouter);
+app.use("/api/admin/dashboard", adminDashboardRouter);
 
 app.use((error, _req, res, _next) => {
   if (error?.code === "LIMIT_FILE_SIZE") {
