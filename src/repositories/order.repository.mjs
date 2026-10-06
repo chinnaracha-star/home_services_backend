@@ -189,6 +189,25 @@ export async function postOrderItemRepository(orderItemData) {
     return result.rows[0];
 }
 
+function formatCreatedAt(value) {
+  const d = value ? new Date(value) : new Date();
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Bangkok",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(d).map((p) => [p.type, p.value])
+  );
+  return {
+    date: `${parts.day}/${parts.month}/${Number(parts.year) + 543}`,
+    time: `${parts.hour}.${parts.minute} น.`,
+  };
+}
+
 export async function getUserOrdersRepository(userId) {
     if (!userId) return [];
 
@@ -339,8 +358,8 @@ export async function getUserOrdersRepository(userId) {
         orderCode: row.orderCode,
         status,
         statusText: statusTextMap[status] || "รอดำเนินการ",
-        scheduledDate: scheduledDate || "25/04/2567",
-        scheduledTime: scheduledTime || "13.00 น.",
+        scheduledDate: scheduledDate || formatCreatedAt(row.createdAt).date,
+        scheduledTime: scheduledTime || formatCreatedAt(row.createdAt).time,
         technicianName: row.technicianName,
         technicianPhone: row.technicianPhone,
         totalPrice: Number(row.totalPrice),
@@ -488,8 +507,8 @@ export async function getOrderByIdRepository(orderIdOrCode, userId) {
       orderCode: row.orderCode,
       status,
       statusText: statusTextMap[status] || "รอดำเนินการ",
-      scheduledDate: scheduledDate || "25/04/2567",
-      scheduledTime: scheduledTime || "13.00 น.",
+      scheduledDate: scheduledDate || formatCreatedAt(row.createdAt).date,
+      scheduledTime: scheduledTime || formatCreatedAt(row.createdAt).time,
       technicianName: row.technicianName,
       technicianPhone: row.technicianPhone,
       totalPrice: Number(row.totalPrice),
